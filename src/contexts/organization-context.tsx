@@ -7,6 +7,7 @@ import { useAuth } from './auth-context'
 type Organization = {
   id: string
   name: string
+  email: string | null
   owner_id: string
   created_at: string
   updated_at: string
@@ -51,18 +52,34 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
     if (!data) {
       // Nenhuma organização encontrada - criar uma padrão
-      const userName = user.email?.split('@')[0] || 'Minha'
+      const orgName = user.user_metadata?.full_name 
+        || user.user_metadata?.name 
+        || user.email?.split('@')[0] 
+        || 'Minha Organização'
+      
       const { data: newOrg, error: createError } = await supabase
         .from('organizations')
-        .insert({ name: `${userName}'s Organization`, owner_id: user.id })
+        .upsert({ 
+          name: orgName, 
+          owner_id: user.id,
+          email: user.email 
+        }, { onConflict: 'owner_id', ignoreDuplicates: true })
         .select()
-        .single()
+        .maybeSingle()
 
       if (createError) {
         console.error('Error creating organization:', createError)
         setOrganization(null)
-      } else {
+      } else if (newOrg) {
         setOrganization(newOrg)
+      } else {
+        // Já foi criada por outra chamada - buscar novamente
+        const { data: existingOrg } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('owner_id', user.id)
+          .maybeSingle()
+        setOrganization(existingOrg)
       }
     } else {
       setOrganization(data)
