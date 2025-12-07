@@ -12,15 +12,35 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { Home, Settings } from 'lucide-react'
+import { Home, Users, BookOpen, ShoppingCart, BarChart3, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const menuItems = [
   {
-    title: 'Home',
+    title: 'Dashboard',
     url: '/',
     icon: Home,
+  },
+  {
+    title: 'Vendedores',
+    url: '/vendedores',
+    icon: Users,
+  },
+  {
+    title: 'Regras',
+    url: '/regras',
+    icon: BookOpen,
+  },
+  {
+    title: 'Vendas',
+    url: '/vendas',
+    icon: ShoppingCart,
+  },
+  {
+    title: 'Relatórios',
+    url: '/relatorios',
+    icon: BarChart3,
   },
   {
     title: 'Configurações',
@@ -37,9 +57,9 @@ export function AppSidebar() {
       <SidebarHeader>
         <div className="flex items-center gap-2 px-4 py-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <span className="text-sm font-bold">S</span>
+            <span className="text-sm font-bold">C</span>
           </div>
-          <span className="font-semibold">Starter Stack</span>
+          <span className="font-semibold">Comissao.io</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -62,7 +82,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-4 py-2 text-xs text-muted-foreground">© 2025 Starter Stack</div>
+        <div className="px-4 py-2 text-xs text-muted-foreground">© 2025 Comissao.io</div>
       </SidebarFooter>
     </Sidebar>
   )
