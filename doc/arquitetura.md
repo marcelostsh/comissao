@@ -95,18 +95,30 @@ src/
 │   ├── supabase.ts                  # Cliente Supabase (browser)
 │   ├── supabase-server.ts           # Cliente Supabase (server)
 │   │
+│   ├── clients/                     # APIs externas (REUTILIZÁVEIS)
+│   │   ├── pipedrive/
+│   │   │   ├── client.ts            # getDeals(), getUsers(), etc.
+│   │   │   ├── auth.ts              # OAuth: getAuthUrl(), exchangeCode(), refreshToken()
+│   │   │   ├── types.ts             # PipedriveDeal, PipedriveUser, etc.
+│   │   │   └── index.ts             # Re-export
+│   │   ├── hubspot/
+│   │   │   └── ...                  # Mesma estrutura
+│   │   └── openai/
+│   │       └── ...                  # Futuro: IA
+│   │
 │   ├── repositories/                # Data Access Layer (DAL)
 │   │   ├── seller-repository.ts
 │   │   ├── rule-repository.ts
 │   │   ├── sale-repository.ts
-│   │   └── commission-repository.ts
+│   │   ├── commission-repository.ts
+│   │   └── integration-repository.ts
 │   │
-│   ├── services/                    # Regras de negócio
+│   ├── services/                    # Regras de negócio (ESPECÍFICAS DO PROJETO)
 │   │   ├── commission-service.ts    # Cálculo de comissões
+│   │   ├── sync-service.ts          # Orquestra: client + repository
 │   │   └── report-service.ts        # Geração de relatórios
 │   │
 │   ├── commission-engine.ts         # Cálculos puros (decimal.js)
-│   ├── pipedrive.ts                 # Client da API Pipedrive
 │   └── pdf-generator.ts             # Geração de PDF
 │
 └── types/                           # Models/Interfaces
@@ -119,17 +131,50 @@ src/
 
 ## Camadas
 
-| Camada             | Pasta                             | Responsabilidade                               |
-| ------------------ | --------------------------------- | ---------------------------------------------- |
-| **Páginas**        | `app/(auth)/`, `app/(dashboard)/` | UI, renderização                               |
-| **Server Actions** | `app/actions/`                    | Entry point, validação Zod, orquestra services |
-| **API Routes**     | `app/api/`                        | Webhooks externos, download de arquivos        |
-| **Componentes**    | `components/`                     | UI reutilizável                                |
-| **Services**       | `lib/services/`                   | Regras de negócio, orquestra repositories      |
-| **Repositories**   | `lib/repositories/`               | Acesso ao banco (DAL)                          |
-| **Clients**        | `lib/pipedrive.ts`                | Chamadas a APIs externas                       |
-| **Engine**         | `lib/commission-engine.ts`        | Cálculos puros (decimal.js)                    |
-| **Types**          | `types/`                          | Models, interfaces, inputs                     |
+| Camada             | Pasta                             | Responsabilidade                               | Reutilizável? |
+| ------------------ | --------------------------------- | ---------------------------------------------- | ------------- |
+| **Páginas**        | `app/(auth)/`, `app/(dashboard)/` | UI, renderização                               | Não           |
+| **Server Actions** | `app/actions/`                    | Entry point, validação Zod, orquestra services | Não           |
+| **API Routes**     | `app/api/`                        | Webhooks externos, OAuth callbacks             | Não           |
+| **Componentes**    | `components/`                     | UI reutilizável                                | Não           |
+| **Services**       | `lib/services/`                   | Regras de negócio, orquestra clients + repos   | Não           |
+| **Repositories**   | `lib/repositories/`               | Acesso ao banco (DAL)                          | Não           |
+| **Clients**        | `lib/clients/`                    | Wrappers HTTP de APIs externas                 | **Sim**       |
+| **Engine**         | `lib/commission-engine.ts`        | Cálculos puros (decimal.js)                    | Sim           |
+| **Types**          | `types/`                          | Models, interfaces, inputs                     | Não           |
+
+### Clients vs Services
+
+**Client** = Wrapper HTTP puro de API externa. Não conhece banco, não conhece domínio. Pode ser copiado para outro projeto.
+
+**Service** = Orquestra clients + repositories para resolver problemas do negócio. Conhece o domínio. Específico deste projeto.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  lib/clients/pipedrive/              ← REUTILIZÁVEL                         │
+│  ├── client.ts                       Só faz HTTP para API do Pipedrive      │
+│  │   └── getDeals(token) → PipedriveDeal[]                                  │
+│  │   └── refreshToken(refreshToken) → TokenResponse                         │
+│  ├── types.ts                        Tipos da API (PipedriveDeal, etc.)     │
+│  └── auth.ts                         OAuth helpers                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ usado por
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  lib/services/sync-service.ts        ← NÃO REUTILIZÁVEL (domínio)           │
+│  │                                                                          │
+│  │  syncDeals(orgId):                                                       │
+│  │    1. integrationRepository.findByOrg(orgId)    ← banco                  │
+│  │    2. pipedriveClient.refreshToken() se expirou ← client                 │
+│  │    3. pipedriveClient.getDeals(token)           ← client                 │
+│  │    4. transformToSale(deal)                     ← domínio                │
+│  │    5. saleRepository.upsertMany(sales)          ← banco                  │
+│  │                                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Regra:** Se amanhã você criar outro projeto que usa Pipedrive, copia `lib/clients/pipedrive/`. O service não, porque usa `Sale`, `saleRepository`, etc.
 
 ## Fluxo de Dados
 
@@ -160,12 +205,22 @@ src/
 
 ### Regras de Comunicação
 
-| De              | Para                    | Como                        |
-| --------------- | ----------------------- | --------------------------- |
-| Frontend        | Backend próprio         | Server Action (RPC)         |
-| Backend         | Banco de dados          | Repository → Supabase       |
-| Backend         | API externa (Pipedrive) | Client (`lib/pipedrive.ts`) |
-| Sistema externo | Backend próprio         | API Route (HTTP)            |
+| De              | Para                    | Como                              |
+| --------------- | ----------------------- | --------------------------------- |
+| Frontend        | Backend próprio         | Server Action (RPC)               |
+| Backend         | Banco de dados          | Repository → Supabase             |
+| Backend         | API externa (Pipedrive) | Client (`lib/clients/pipedrive/`) |
+| Backend         | API externa (HubSpot)   | Client (`lib/clients/hubspot/`)   |
+| Backend         | API externa (OpenAI)    | Client (`lib/clients/openai/`)    |
+| Sistema externo | Backend próprio         | API Route (HTTP)                  |
+
+**Quem chama o Client?**
+
+| Chamador          | Quando                                             |
+| ----------------- | -------------------------------------------------- |
+| **Service**       | Operações complexas (sync de deals, refresh token) |
+| **API Route**     | OAuth callback (`/api/pipedrive/callback`)         |
+| **Server Action** | Operações simples que não precisam de service      |
 
 ## Padrões
 
@@ -201,38 +256,38 @@ Services orquestram repositories e aplicam lógica complexa.
 
 ```typescript
 // lib/services/commission-service.ts
-import { Decimal } from "decimal.js";
-import { saleRepository } from "@/lib/repositories/sale-repository";
-import { ruleRepository } from "@/lib/repositories/rule-repository";
-import { commissionRepository } from "@/lib/repositories/commission-repository";
+import { Decimal } from 'decimal.js'
+import { saleRepository } from '@/lib/repositories/sale-repository'
+import { ruleRepository } from '@/lib/repositories/rule-repository'
+import { commissionRepository } from '@/lib/repositories/commission-repository'
 
 export const commissionService = {
   async calculateForPeriod(orgId: string, period: string) {
     // 1. Busca dados de múltiplos repositories
-    const sales = await saleRepository.findByPeriod(orgId, period);
-    const rules = await ruleRepository.findByOrganization(orgId);
+    const sales = await saleRepository.findByPeriod(orgId, period)
+    const rules = await ruleRepository.findByOrganization(orgId)
 
     // 2. Aplica regras de negócio
     const commissions = sales.map((sale) => {
-      const rule = rules.find((r) => r.id === sale.rule_id);
+      const rule = rules.find((r) => r.id === sale.rule_id)
       const amount = new Decimal(sale.net_value)
         .times(rule.percentage)
         .dividedBy(100)
-        .toDecimalPlaces(2);
+        .toDecimalPlaces(2)
 
       return {
         sale_id: sale.id,
         seller_id: sale.seller_id,
         amount: amount.toNumber(),
-      };
-    });
+      }
+    })
 
     // 3. Persiste resultado
-    await commissionRepository.createMany(commissions);
+    await commissionRepository.createMany(commissions)
 
-    return commissions;
+    return commissions
   },
-};
+}
 ```
 
 ### Types (Models)
@@ -242,34 +297,31 @@ Types definem a estrutura dos dados em todas as camadas.
 ```typescript
 // types/seller.ts
 export type Seller = {
-  id: string;
-  organization_id: string;
-  name: string;
-  email: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
+  id: string
+  organization_id: string
+  name: string
+  email: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
 
 // Inputs para criação/atualização
-export type CreateSellerInput = Omit<
-  Seller,
-  "id" | "created_at" | "updated_at"
->;
-export type UpdateSellerInput = Partial<CreateSellerInput>;
+export type CreateSellerInput = Omit<Seller, 'id' | 'created_at' | 'updated_at'>
+export type UpdateSellerInput = Partial<CreateSellerInput>
 
 // Com relações (para queries com JOIN)
 export type SellerWithCommissions = Seller & {
-  commissions: Commission[];
-};
+  commissions: Commission[]
+}
 ```
 
 ```typescript
 // types/index.ts - Re-export centralizado
-export * from "./seller";
-export * from "./rule";
-export * from "./sale";
-export * from "./commission";
+export * from './seller'
+export * from './rule'
+export * from './sale'
+export * from './commission'
 ```
 
 ### Server Actions vs API Routes
@@ -305,8 +357,16 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
-# Pipedrive (MVP)
-PIPEDRIVE_API_TOKEN=seu_token_aqui
+# Pipedrive OAuth (MVP)
+PIPEDRIVE_CLIENT_ID=xxx
+PIPEDRIVE_CLIENT_SECRET=xxx
+
+# HubSpot OAuth (Fase 2+)
+HUBSPOT_CLIENT_ID=xxx
+HUBSPOT_CLIENT_SECRET=xxx
+
+# OpenAI (Fase 4+)
+OPENAI_API_KEY=sk-xxx
 
 # Resend (Fase 2+)
 RESEND_API_KEY=re_xxx
@@ -322,17 +382,17 @@ Schemas ficam junto com as Actions que os utilizam.
 
 ```typescript
 // app/actions/sellers.ts
-import { z } from "zod";
+import { z } from 'zod'
 
 const createSellerSchema = z.object({
-  name: z.string().min(1, "Nome obrigatório"),
-  email: z.string().email("Email inválido"),
+  name: z.string().min(1, 'Nome obrigatório'),
+  email: z.string().email('Email inválido'),
   organization_id: z.string().uuid(),
-});
+})
 
 const updateSellerSchema = createSellerSchema.partial().extend({
   id: z.string().uuid(),
-});
+})
 ```
 
 ### Exemplo Completo de Fluxo
@@ -342,130 +402,114 @@ const updateSellerSchema = createSellerSchema.partial().extend({
 ```typescript
 // types/seller.ts
 export type Seller = {
-  id: string;
-  organization_id: string;
-  name: string;
-  email: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
+  id: string
+  organization_id: string
+  name: string
+  email: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
 
-export type CreateSellerInput = Omit<
-  Seller,
-  "id" | "created_at" | "updated_at"
->;
-export type UpdateSellerInput = Partial<CreateSellerInput>;
+export type CreateSellerInput = Omit<Seller, 'id' | 'created_at' | 'updated_at'>
+export type UpdateSellerInput = Partial<CreateSellerInput>
 ```
 
 #### 2. Repository (Acesso ao Banco)
 
 ```typescript
 // lib/repositories/seller-repository.ts
-import { createClient } from "@/lib/supabase-server";
-import type { Seller, CreateSellerInput, UpdateSellerInput } from "@/types";
+import { createClient } from '@/lib/supabase-server'
+import type { Seller, CreateSellerInput, UpdateSellerInput } from '@/types'
 
 export const sellerRepository = {
   async findById(id: string): Promise<Seller | null> {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("sellers")
-      .select("*")
-      .eq("id", id)
-      .single();
+    const supabase = await createClient()
+    const { data, error } = await supabase.from('sellers').select('*').eq('id', id).single()
 
-    if (error) return null;
-    return data;
+    if (error) return null
+    return data
   },
 
   async findByOrganization(orgId: string): Promise<Seller[]> {
-    const supabase = await createClient();
+    const supabase = await createClient()
     const { data, error } = await supabase
-      .from("sellers")
-      .select("*")
-      .eq("organization_id", orgId)
-      .eq("is_active", true)
-      .order("name");
+      .from('sellers')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('is_active', true)
+      .order('name')
 
-    if (error) throw new Error(error.message);
-    return data;
+    if (error) throw new Error(error.message)
+    return data
   },
 
   async create(input: CreateSellerInput): Promise<Seller> {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("sellers")
-      .insert(input)
-      .select()
-      .single();
+    const supabase = await createClient()
+    const { data, error } = await supabase.from('sellers').insert(input).select().single()
 
-    if (error) throw new Error(error.message);
-    return data;
+    if (error) throw new Error(error.message)
+    return data
   },
 
   async update(id: string, input: UpdateSellerInput): Promise<Seller> {
-    const supabase = await createClient();
+    const supabase = await createClient()
     const { data, error } = await supabase
-      .from("sellers")
+      .from('sellers')
       .update(input)
-      .eq("id", id)
+      .eq('id', id)
       .select()
-      .single();
+      .single()
 
-    if (error) throw new Error(error.message);
-    return data;
+    if (error) throw new Error(error.message)
+    return data
   },
 
   async delete(id: string): Promise<void> {
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from("sellers")
-      .update({ is_active: false })
-      .eq("id", id);
+    const supabase = await createClient()
+    const { error } = await supabase.from('sellers').update({ is_active: false }).eq('id', id)
 
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message)
   },
-};
+}
 ```
 
 #### 3. Server Action (Entry Point)
 
 ```typescript
 // app/actions/sellers.ts
-"use server";
+'use server'
 
-import { z } from "zod";
-import { sellerRepository } from "@/lib/repositories/seller-repository";
-import { revalidatePath } from "next/cache";
+import { z } from 'zod'
+import { sellerRepository } from '@/lib/repositories/seller-repository'
+import { revalidatePath } from 'next/cache'
 
 // Schema de validação
 const createSellerSchema = z.object({
-  name: z.string().min(1, "Nome obrigatório"),
-  email: z.string().email("Email inválido"),
+  name: z.string().min(1, 'Nome obrigatório'),
+  email: z.string().email('Email inválido'),
   organization_id: z.string().uuid(),
-});
+})
 
 // Types de retorno
-type ActionResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string };
+type ActionResult<T> = { success: true; data: T } | { success: false; error: string }
 
 // Actions
 export async function getSellers(orgId: string) {
-  return sellerRepository.findByOrganization(orgId);
+  return sellerRepository.findByOrganization(orgId)
 }
 
 export async function getSellerById(id: string) {
-  return sellerRepository.findById(id);
+  return sellerRepository.findById(id)
 }
 
 export async function createSeller(
   input: z.infer<typeof createSellerSchema>
 ): Promise<ActionResult<Seller>> {
   // 1. Valida input
-  const parsed = createSellerSchema.safeParse(input);
+  const parsed = createSellerSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message };
+    return { success: false, error: parsed.error.errors[0].message }
   }
 
   // 2. Chama repository
@@ -473,14 +517,14 @@ export async function createSeller(
     const seller = await sellerRepository.create({
       ...parsed.data,
       is_active: true,
-    });
+    })
 
     // 3. Revalida cache da página
-    revalidatePath("/vendedores");
+    revalidatePath('/vendedores')
 
-    return { success: true, data: seller };
+    return { success: true, data: seller }
   } catch (err) {
-    return { success: false, error: "Erro ao criar vendedor" };
+    return { success: false, error: 'Erro ao criar vendedor' }
   }
 }
 
@@ -489,21 +533,21 @@ export async function updateSeller(
   input: Partial<z.infer<typeof createSellerSchema>>
 ): Promise<ActionResult<Seller>> {
   try {
-    const seller = await sellerRepository.update(id, input);
-    revalidatePath("/vendedores");
-    return { success: true, data: seller };
+    const seller = await sellerRepository.update(id, input)
+    revalidatePath('/vendedores')
+    return { success: true, data: seller }
   } catch (err) {
-    return { success: false, error: "Erro ao atualizar vendedor" };
+    return { success: false, error: 'Erro ao atualizar vendedor' }
   }
 }
 
 export async function deleteSeller(id: string): Promise<ActionResult<void>> {
   try {
-    await sellerRepository.delete(id);
-    revalidatePath("/vendedores");
-    return { success: true, data: undefined };
+    await sellerRepository.delete(id)
+    revalidatePath('/vendedores')
+    return { success: true, data: undefined }
   } catch (err) {
-    return { success: false, error: "Erro ao excluir vendedor" };
+    return { success: false, error: 'Erro ao excluir vendedor' }
   }
 }
 ```
@@ -609,9 +653,7 @@ export default async function VendedoresPage() {
 
 ```typescript
 // Padrão de retorno de Action
-type ActionResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string };
+type ActionResult<T> = { success: true; data: T } | { success: false; error: string }
 ```
 
 ### Como Adicionar Nova Funcionalidade
@@ -640,3 +682,99 @@ Exemplo: adicionar listagem de regras de comissão.
 - Composição dos componentes
 
 **Passo 6:** Se precisar de lógica complexa, criar service em `lib/services/`
+
+---
+
+### Como Adicionar Nova Integração Externa (Client)
+
+Exemplo: adicionar integração com HubSpot.
+
+**Passo 1:** Criar pasta `lib/clients/hubspot/`
+
+**Passo 2:** Criar types da API em `lib/clients/hubspot/types.ts`
+
+```typescript
+// lib/clients/hubspot/types.ts
+export type HubSpotDeal = {
+  id: string
+  properties: {
+    dealname: string
+    amount: string
+    closedate: string
+    dealstage: string
+  }
+}
+
+export type HubSpotTokenResponse = {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+}
+```
+
+**Passo 3:** Criar auth helpers em `lib/clients/hubspot/auth.ts`
+
+```typescript
+// lib/clients/hubspot/auth.ts
+const HUBSPOT_AUTH_URL = 'https://app.hubspot.com/oauth/authorize'
+const HUBSPOT_TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token'
+
+export function getAuthUrl(redirectUri: string, state: string): string {
+  const params = new URLSearchParams({
+    client_id: process.env.HUBSPOT_CLIENT_ID!,
+    redirect_uri: redirectUri,
+    scope: 'crm.objects.deals.read',
+    state,
+  })
+  return `${HUBSPOT_AUTH_URL}?${params}`
+}
+
+export async function exchangeCode(
+  code: string,
+  redirectUri: string
+): Promise<HubSpotTokenResponse> {
+  // ... implementação
+}
+
+export async function refreshToken(refreshToken: string): Promise<HubSpotTokenResponse> {
+  // ... implementação
+}
+```
+
+**Passo 4:** Criar client em `lib/clients/hubspot/client.ts`
+
+```typescript
+// lib/clients/hubspot/client.ts
+import type { HubSpotDeal } from './types'
+
+const BASE_URL = 'https://api.hubapi.com'
+
+export const hubspotClient = {
+  async getDeals(accessToken: string): Promise<HubSpotDeal[]> {
+    const res = await fetch(`${BASE_URL}/crm/v3/objects/deals`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    const data = await res.json()
+    return data.results
+  },
+}
+```
+
+**Passo 5:** Criar index para re-export em `lib/clients/hubspot/index.ts`
+
+```typescript
+// lib/clients/hubspot/index.ts
+export * from './client'
+export * from './auth'
+export * from './types'
+```
+
+**Passo 6:** Se precisar orquestrar com banco, criar/atualizar service em `lib/services/`
+
+**Regras do Client:**
+
+- **NÃO** importar nada de `@/lib/repositories`
+- **NÃO** importar nada de `@/types` (usar types próprios do client)
+- **NÃO** conhecer domínio do projeto (Sale, Commission, etc.)
+- **PODE** usar variáveis de ambiente (`process.env.HUBSPOT_*`)
+- **DEVE** ser copiável para outro projeto sem modificações

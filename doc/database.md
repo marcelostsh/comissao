@@ -70,6 +70,30 @@
 │  ├── created_at                                                              │
 │  └── updated_at                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  integration_types (tipos de CRM suportados)                                 │
+│  ├── id (uuid, PK)                                                           │
+│  ├── name (text, UNIQUE) ← 'pipedrive', 'hubspot'                            │
+│  ├── description (text)                                                      │
+│  └── created_at                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ 1:N
+                                      ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  integrations (OAuth tokens por organização)                                 │
+│  ├── id (uuid, PK)                                                           │
+│  ├── organization_id (FK → organizations)                                    │
+│  ├── integration_type_id (FK → integration_types)                            │
+│  ├── provider_account_id (text) ← company_domain (Pipedrive), portal_id (HS) │
+│  ├── access_token (text)                                                     │
+│  ├── refresh_token (text)                                                    │
+│  ├── expires_at (timestamptz)                                                │
+│  ├── created_at                                                              │
+│  └── updated_at                                                              │
+│  UNIQUE (organization_id, integration_type_id)                               │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Relacionamentos
@@ -79,9 +103,11 @@ auth.users 1 ──── 1 organizations
 organizations 1 ──── N sellers
 organizations 1 ──── N commission_rules
 organizations 1 ──── N sales
+organizations 1 ──── N integrations
 sellers 1 ──── N sales
 sales 1 ──── 1 commissions
 commission_rules 1 ──── N commissions
+integration_types 1 ──── N integrations
 ```
 
 ## Observações

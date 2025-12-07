@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from './auth-context'
 
@@ -26,67 +26,71 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(true)
   const { user, isConfigured } = useAuth()
   const supabase = createClient()
+  const isFetching = useRef(false)
 
-  const fetchOrganization = async () => {
-    if (!user || !supabase) {
-      setOrganization(null)
-      setLoading(false)
+  const fetchOrganization = useCallback(async () => {
+    if (!user || !supabase || isFetching.current) {
+      if (!user) {
+        setOrganization(null)
+        setLoading(false)
+      }
       return
     }
 
+    isFetching.current = true
     setLoading(true)
 
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (error) {
-      console.error('Error fetching organization:', error)
-      setOrganization(null)
-      setLoading(false)
-      return
-    }
-
-    if (!data) {
-      // Nenhuma organização encontrada - criar uma padrão
-      const orgName = user.user_metadata?.full_name 
-        || user.user_metadata?.name 
-        || user.email?.split('@')[0] 
-        || 'Minha Organização'
-      
-      const { data: newOrg, error: createError } = await supabase
+    try {
+      const { data, error } = await supabase
         .from('organizations')
-        .upsert({ 
-          name: orgName, 
-          owner_id: user.id,
-          email: user.email 
-        }, { onConflict: 'owner_id', ignoreDuplicates: true })
-        .select()
+        .select('*')
+        .eq('owner_id', user.id)
+        .limit(1)
         .maybeSingle()
 
-      if (createError) {
-        console.error('Error creating organization:', createError)
+      if (error) {
+        console.error('Error fetching organization:', error)
         setOrganization(null)
-      } else if (newOrg) {
-        setOrganization(newOrg)
-      } else {
-        // Já foi criada por outra chamada - buscar novamente
-        const { data: existingOrg } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('owner_id', user.id)
-          .maybeSingle()
-        setOrganization(existingOrg)
+        return
       }
-    } else {
-      setOrganization(data)
-    }
 
-    setLoading(false)
-  }
+      if (!data) {
+        const orgName = user.user_metadata?.full_name 
+          || user.user_metadata?.name 
+          || user.email?.split('@')[0] 
+          || 'Minha Organização'
+        
+        const { data: newOrg, error: createError } = await supabase
+          .from('organizations')
+          .upsert({ 
+            name: orgName, 
+            owner_id: user.id,
+            email: user.email 
+          }, { onConflict: 'owner_id', ignoreDuplicates: true })
+          .select()
+          .maybeSingle()
+
+        if (createError) {
+          console.error('Error creating organization:', createError)
+          setOrganization(null)
+        } else if (newOrg) {
+          setOrganization(newOrg)
+        } else {
+          const { data: existingOrg } = await supabase
+            .from('organizations')
+            .select('*')
+            .eq('owner_id', user.id)
+            .maybeSingle()
+          setOrganization(existingOrg)
+        }
+      } else {
+        setOrganization(data)
+      }
+    } finally {
+      setLoading(false)
+      isFetching.current = false
+    }
+  }, [user, supabase])
 
   useEffect(() => {
     if (!isConfigured) {
@@ -94,17 +98,20 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       return
     }
     fetchOrganization()
-  }, [user, isConfigured])
+  }, [isConfigured, fetchOrganization])
 
-  const refresh = async () => {
+  const isLoading = !isConfigured ? false : loading
+
+  const refresh = useCallback(async () => {
+    isFetching.current = false
     await fetchOrganization()
-  }
+  }, [fetchOrganization])
 
   return (
     <OrganizationContext.Provider
       value={{
         organization,
-        loading,
+        loading: isLoading,
         refresh,
       }}
     >
