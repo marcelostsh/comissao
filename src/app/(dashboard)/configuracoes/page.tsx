@@ -5,12 +5,13 @@ import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { useOrganization } from '@/contexts/organization-context'
 import { getPipedriveIntegration, disconnectIntegration, importPipedriveSellers } from '@/app/actions/integrations'
+import { forceSyncSales } from '@/app/actions/sales'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { Check, ExternalLink, Unplug, Users, Loader2 } from 'lucide-react'
+import { Check, ExternalLink, Unplug, Users, Loader2, ShoppingCart } from 'lucide-react'
 import type { IntegrationWithType } from '@/types'
 
 export default function ConfiguracoesPage() {
@@ -21,6 +22,7 @@ export default function ConfiguracoesPage() {
   const [loading, setLoading] = useState(true)
   const [disconnecting, setDisconnecting] = useState(false)
   const [importingSellers, setImportingSellers] = useState(false)
+  const [importingSales, setImportingSales] = useState(false)
 
   // Mostrar toast baseado em query params (retorno do OAuth)
   useEffect(() => {
@@ -93,6 +95,23 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  async function handleImportSales() {
+    if (!organization) return
+
+    setImportingSales(true)
+    try {
+      const result = await forceSyncSales(organization.id)
+      if (result.success) {
+        const { synced, skipped, errors } = result.data
+        toast.success(`Sincronização concluída: ${synced} importadas, ${skipped} ignoradas${errors > 0 ? `, ${errors} erros` : ''}`)
+      } else {
+        toast.error(result.error)
+      }
+    } finally {
+      setImportingSales(false)
+    }
+  }
+
   if (orgLoading) {
     return (
       <div className="space-y-6">
@@ -124,7 +143,7 @@ export default function ConfiguracoesPage() {
         <CardHeader>
           <CardTitle>CRM</CardTitle>
           <CardDescription>
-            Conecte seu CRM para sincronizar vendas automaticamente
+            Integração com seu sistema de vendas. Deals fechados são importados automaticamente para calcular comissões. Conectar é rápido — basta autorizar o acesso e pronto.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -205,10 +224,10 @@ export default function ConfiguracoesPage() {
           <CardHeader>
             <CardTitle>Sincronização</CardTitle>
             <CardDescription>
-              Importe dados do CRM para o sistema
+              O sistema sincroniza automaticamente a cada acesso. Quer forçar agora? Clique no botão — pode usar quando quiser.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center gap-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
@@ -236,6 +255,33 @@ export default function ConfiguracoesPage() {
                 )}
               </Button>
             </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                  <ShoppingCart className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="font-medium">Importar Vendas</span>
+                  <p className="text-sm text-muted-foreground">
+                    Importa deals ganhos do Pipedrive como vendas
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleImportSales}
+                disabled={importingSales}
+              >
+                {importingSales ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Importando...
+                  </>
+                ) : (
+                  'Importar'
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -245,7 +291,7 @@ export default function ConfiguracoesPage() {
         <CardHeader>
           <CardTitle>Organização</CardTitle>
           <CardDescription>
-            Informações da sua organização
+            Dados da empresa. Aqui você configura nome e regras fiscais (taxa de dedução) que afetam o cálculo das comissões. São poucos campos — leva menos de 1 minuto.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -269,7 +315,7 @@ export default function ConfiguracoesPage() {
         <CardHeader>
           <CardTitle>Conta</CardTitle>
           <CardDescription>
-            Informações da sua conta
+            Seus dados pessoais de acesso. Vinculado ao login Google.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

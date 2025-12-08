@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useOrganization } from '@/contexts/organization-context'
 import { getSellersWithRules } from '@/app/actions/sellers'
+import { importPipedriveSellers, getPipedriveIntegration } from '@/app/actions/integrations'
 import { SellerTable, SellerDialog } from '@/components/sellers'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Users } from 'lucide-react'
-import type { SellerWithRule } from '@/types'
+import { toast } from 'sonner'
+import { Plus, Users, Download, Loader2 } from 'lucide-react'
+import type { SellerWithRule, IntegrationWithType } from '@/types'
 
 export default function VendedoresPage() {
   const { organization, loading: orgLoading } = useOrganization()
@@ -16,6 +18,8 @@ export default function VendedoresPage() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showInactive, setShowInactive] = useState(false)
+  const [integration, setIntegration] = useState<IntegrationWithType | null>(null)
+  const [importing, setImporting] = useState(false)
 
   const loadSellers = useCallback(async () => {
     if (!organization) return
@@ -31,6 +35,32 @@ export default function VendedoresPage() {
   useEffect(() => {
     loadSellers()
   }, [loadSellers])
+
+  useEffect(() => {
+    async function loadIntegration() {
+      if (!organization) return
+      const data = await getPipedriveIntegration(organization.id)
+      setIntegration(data)
+    }
+    loadIntegration()
+  }, [organization])
+
+  async function handleImportSellers() {
+    if (!organization) return
+    setImporting(true)
+    try {
+      const result = await importPipedriveSellers(organization.id)
+      if (result.success) {
+        const { imported, updated, skipped } = result.data
+        toast.success(`Importação concluída: ${imported} novos, ${updated} atualizados, ${skipped} ignorados`)
+        loadSellers()
+      } else {
+        toast.error(result.error)
+      }
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const handleDialogChange = (open: boolean) => {
     setDialogOpen(open)
@@ -68,10 +98,22 @@ export default function VendedoresPage() {
             Gerencie os vendedores da sua organização
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Vendedor
-        </Button>
+        <div className="flex gap-2">
+          {integration && (
+            <Button variant="outline" onClick={handleImportSellers} disabled={importing}>
+              {importing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {importing ? 'Importando...' : 'Importar'}
+            </Button>
+          )}
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Vendedor
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
