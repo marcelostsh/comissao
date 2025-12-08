@@ -63,10 +63,19 @@ export default function VendasPage() {
     setLoading(true)
     try {
       const data = await getSalesWithSellers(organization.id)
+      console.log('[vendas] fetched sales', { total: data.length, period })
       // Filtra pelo período selecionado
       const filtered = data.filter((sale) => {
         const salePeriod = sale.sale_date.substring(0, 7)
         return salePeriod === period
+      })
+      console.log('[vendas] filtered sales', {
+        afterFilter: filtered.length,
+        sample: filtered.slice(0, 3).map((s) => ({
+          id: s.id,
+          date: s.sale_date,
+          seller: s.seller?.name,
+        })),
       })
       setSales(filtered)
 

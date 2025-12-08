@@ -135,6 +135,10 @@ export const pipedriveSyncService = {
         sellersByPipedriveId.set(seller.pipedrive_id, seller.id)
       }
     }
+    console.log('[sync] sellers mapped', {
+      count: sellersByPipedriveId.size,
+      pipedriveIds: Array.from(sellersByPipedriveId.keys()),
+    })
 
     // Se não há vendedores com pipedrive_id, não há o que sincronizar
     if (sellersByPipedriveId.size === 0) {
@@ -144,6 +148,7 @@ export const pipedriveSyncService = {
 
     // Buscar todos os deals ganhos
     const deals = await client.getAllWonDeals()
+    console.log('[sync] deals fetched', { total: deals.length })
 
     if (deals.length === 0) {
       await this.updateLastSyncedAt(organizationId)
@@ -153,6 +158,7 @@ export const pipedriveSyncService = {
     // Buscar external_ids já existentes
     const externalIds = deals.map((d) => String(d.id))
     const existingIds = await saleRepository.getExistingExternalIds(organizationId, externalIds)
+    console.log('[sync] existing external ids', { count: existingIds.size })
 
     // Filtrar e transformar deals
     const salesToInsert: CreateSaleInput[] = []
@@ -165,13 +171,24 @@ export const pipedriveSyncService = {
       // Skip se já existe
       if (existingIds.has(externalId)) {
         skipped++
+        console.log('[sync] skipped (already exists)', { externalId })
         continue
       }
 
       // Skip se não tem vendedor correspondente
-      const sellerId = sellersByPipedriveId.get(deal.user_id)
+      // user_id pode vir como objeto { id, name, ... } ou número direto
+      const pipedriveUserId = typeof deal.user_id === 'object' 
+        ? (deal.user_id as { id: number }).id 
+        : deal.user_id
+      const sellerId = sellersByPipedriveId.get(pipedriveUserId)
       if (!sellerId) {
         skipped++
+        debugger
+        console.log('[sync] skipped (no seller match)', {
+          externalId,
+          userId: deal.user_id,
+          title: deal.title,
+        })
         continue
       }
 
