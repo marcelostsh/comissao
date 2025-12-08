@@ -56,6 +56,11 @@ export type CommissionSummary = {
   sellers_count: number
 }
 
+// Resumo completo do dashboard (totais + por vendedor)
+export type DashboardSummary = CommissionSummary & {
+  sellers: SellerCommissionSummary[]
+}
+
 // Resumo por vendedor
 export type SellerCommissionSummary = {
   seller_id: string

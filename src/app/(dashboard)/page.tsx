@@ -1,19 +1,90 @@
 'use client'
 
-import { useAuth } from '@/contexts/auth-context'
+import { useState, useEffect, useCallback } from 'react'
 import { useOrganization } from '@/contexts/organization-context'
+import { getDashboardSummary } from '@/app/actions/commissions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { ShoppingCart, DollarSign, Calculator } from 'lucide-react'
+import type { DashboardSummary } from '@/types'
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value)
+}
+
+function getCurrentPeriod(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+function generatePeriods(): { value: string; label: string }[] {
+  const periods = []
+  const now = new Date()
+
+  for (let i = 0; i < 12; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date)
+    periods.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) })
+  }
+
+  return periods
+}
+
+function formatPeriodLabel(period: string): string {
+  const [year, month] = period.split('-')
+  const date = new Date(Number(year), Number(month) - 1, 1)
+  const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date)
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
 
 export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth()
   const { organization, loading: orgLoading } = useOrganization()
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState(getCurrentPeriod())
 
-  if (authLoading || orgLoading) {
+  const periods = generatePeriods()
+
+  const loadSummary = useCallback(async () => {
+    if (!organization) return
+    setLoading(true)
+    try {
+      const data = await getDashboardSummary(organization.id, period)
+      setSummary(data)
+    } finally {
+      setLoading(false)
+    }
+  }, [organization, period])
+
+  useEffect(() => {
+    loadSummary()
+  }, [loadSummary])
+
+  if (orgLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-32" />
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
@@ -22,43 +93,163 @@ export default function DashboardPage() {
     )
   }
 
+  if (!organization) {
+    return (
+      <div className="text-muted-foreground text-center py-8">
+        Organização não encontrada
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Resumo de {formatPeriodLabel(period)}
+          </p>
+        </div>
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Selecione o período" />
+          </SelectTrigger>
+          <SelectContent>
+            {periods.map((p) => (
+              <SelectItem key={p.value} value={p.value}>
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Bem-vindo</CardTitle>
-            <CardDescription>Você está logado como</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vendas</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">{user?.email ?? 'Não logado'}</p>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{summary?.total_sales ?? 0}</div>
+                <p className="text-xs text-muted-foreground">no período</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Organização</CardTitle>
-            <CardDescription>Sua organização atual</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Bruto</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              {organization?.name ?? 'Nenhuma organização'}
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(summary?.total_gross_value ?? 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">valor original</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Starter Stack</CardTitle>
-            <CardDescription>Template SaaS</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Líquido</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Next.js + Supabase + shadcn/ui</p>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(summary?.total_net_value ?? 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">após deduções</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Comissões</CardTitle>
+            <Calculator className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-green-600">
+                  {formatCurrency(summary?.total_commission ?? 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {summary?.sellers_count ?? 0} vendedor(es)
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Vendedores</CardTitle>
+          <CardDescription>Resumo de comissões por vendedor no período</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : summary?.sellers.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              Nenhuma venda no período
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vendedor</TableHead>
+                  <TableHead className="text-right">Vendas</TableHead>
+                  <TableHead className="text-right">Total Bruto</TableHead>
+                  <TableHead className="text-right">Total Líquido</TableHead>
+                  <TableHead className="text-right">Comissão</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summary?.sellers.map((seller) => (
+                  <TableRow key={seller.seller_id}>
+                    <TableCell className="font-medium">{seller.seller_name}</TableCell>
+                    <TableCell className="text-right">{seller.sales_count}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(seller.total_gross_value)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(seller.total_net_value)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-green-600">
+                      {formatCurrency(seller.total_commission)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

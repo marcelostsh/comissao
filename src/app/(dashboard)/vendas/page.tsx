@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { RefreshCw, ShoppingCart, DollarSign, Lock, Calculator, RotateCcw, X, MoreVertical } from 'lucide-react'
+import { RefreshCw, Lock, RotateCcw, X, MoreVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import type { SaleWithCommission } from '@/types'
 
@@ -48,13 +48,6 @@ function generatePeriods(): { value: string; label: string }[] {
   }
 
   return periods
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value)
 }
 
 // Período atual
@@ -184,9 +177,6 @@ export default function VendasPage() {
     )
   }
 
-  const totalGross = sales.reduce((sum, s) => sum + Number(s.gross_value), 0)
-  const totalNet = sales.reduce((sum, s) => sum + Number(s.net_value), 0)
-  const totalCommission = sales.reduce((sum, s) => sum + (s.commission?.amount ?? 0), 0)
   const openSalesCount = sales.filter((s) => s.commission && !s.commission.is_closed).length
   const closedSalesCount = sales.filter((s) => s.commission?.is_closed).length
 
@@ -239,49 +229,6 @@ export default function VendasPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vendas</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{sales.length}</div>
-            <p className="text-xs text-muted-foreground">no período</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Bruto</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalGross)}</div>
-            <p className="text-xs text-muted-foreground">valor original</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Líquido</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalNet)}</div>
-            <p className="text-xs text-muted-foreground">após deduções</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Comissões</CardTitle>
-            <Calculator className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(totalCommission)}</div>
-            <p className="text-xs text-muted-foreground">a pagar</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>

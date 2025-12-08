@@ -8,6 +8,7 @@ import type {
   CommissionWithDetails,
   SellerCommissionSummary,
   SaleWithCommission,
+  DashboardSummary,
 } from '@/types'
 
 // Types de retorno
@@ -223,6 +224,57 @@ export async function deleteCommissionsByPeriod(
     return { success: true, data: undefined }
   } catch (err) {
     return { success: false, error: 'Erro ao excluir comissões do período' }
+  }
+}
+
+/**
+ * Retorna resumo do dashboard para um período
+ * Agrega vendas e comissões (híbrido: fechadas + on-the-fly)
+ */
+export async function getDashboardSummary(
+  organizationId: string,
+  period: string
+): Promise<DashboardSummary> {
+  const sales = await commissionService.getSalesWithCommissions(organizationId, period)
+
+  // Agrupa por vendedor
+  const sellerMap = new Map<string, SellerCommissionSummary>()
+
+  for (const sale of sales) {
+    const sellerId = sale.seller_id
+    const sellerName = sale.seller?.name ?? 'Desconhecido'
+
+    if (!sellerMap.has(sellerId)) {
+      sellerMap.set(sellerId, {
+        seller_id: sellerId,
+        seller_name: sellerName,
+        period,
+        sales_count: 0,
+        total_gross_value: 0,
+        total_net_value: 0,
+        total_commission: 0,
+      })
+    }
+
+    const sellerSummary = sellerMap.get(sellerId)!
+    sellerSummary.sales_count++
+    sellerSummary.total_gross_value += Number(sale.gross_value)
+    sellerSummary.total_net_value += Number(sale.net_value)
+    sellerSummary.total_commission += sale.commission?.amount ?? 0
+  }
+
+  const sellers = Array.from(sellerMap.values()).sort(
+    (a, b) => b.total_commission - a.total_commission
+  )
+
+  return {
+    period,
+    total_sales: sales.length,
+    total_gross_value: sales.reduce((sum, s) => sum + Number(s.gross_value), 0),
+    total_net_value: sales.reduce((sum, s) => sum + Number(s.net_value), 0),
+    total_commission: sales.reduce((sum, s) => sum + (s.commission?.amount ?? 0), 0),
+    sellers_count: sellers.length,
+    sellers,
   }
 }
 
