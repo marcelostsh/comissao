@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useOrganization } from '@/contexts/organization-context'
 import { getSalesWithSellers, forceSyncSales } from '@/app/actions/sales'
-import { calculateCommissionsForPeriod, getTotalCommissionsByPeriod } from '@/app/actions/commissions'
+import { calculateCommissionsForPeriod, getTotalCommissionsByPeriod, getCommissionsByPeriod } from '@/app/actions/commissions'
 import { SalesTable } from '@/components/sales'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { RefreshCw, ShoppingCart, DollarSign, Calculator } from 'lucide-react'
 import { toast } from 'sonner'
-import type { SaleWithSeller } from '@/types'
+import type { SaleWithSeller, Commission } from '@/types'
 
 // Gera lista de períodos (últimos 12 meses)
 function generatePeriods(): { value: string; label: string }[] {
@@ -55,6 +55,7 @@ export default function VendasPage() {
   const [calculating, setCalculating] = useState(false)
   const [period, setPeriod] = useState(getCurrentPeriod())
   const [totalCommission, setTotalCommission] = useState(0)
+  const [commissions, setCommissions] = useState<Commission[]>([])
 
   const periods = generatePeriods()
 
@@ -79,9 +80,13 @@ export default function VendasPage() {
       })
       setSales(filtered)
 
-      // Carrega total de comissões do período
-      const total = await getTotalCommissionsByPeriod(organization.id, period)
+      // Carrega comissões do período
+      const [total, periodCommissions] = await Promise.all([
+        getTotalCommissionsByPeriod(organization.id, period),
+        getCommissionsByPeriod(organization.id, period),
+      ])
       setTotalCommission(total)
+      setCommissions(periodCommissions)
     } finally {
       setLoading(false)
     }
@@ -127,6 +132,9 @@ export default function VendasPage() {
           toast.info('Nenhuma comissão para calcular')
         }
         setTotalCommission(totalAmount)
+        // Recarrega comissões para atualizar a tabela
+        const periodCommissions = await getCommissionsByPeriod(organization.id, period)
+        setCommissions(periodCommissions)
       } else {
         toast.error(result.error)
       }
@@ -246,7 +254,7 @@ export default function VendasPage() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : (
-            <SalesTable sales={sales} />
+            <SalesTable sales={sales} commissions={commissions} />
           )}
         </CardContent>
       </Card>
