@@ -6,12 +6,22 @@ import { useAuth } from '@/contexts/auth-context'
 import { useOrganization } from '@/contexts/organization-context'
 import { getPipedriveIntegration, disconnectIntegration, importPipedriveSellers } from '@/app/actions/integrations'
 import { forceSyncSales } from '@/app/actions/sales'
-import { updateOrganization } from '@/app/actions/organizations'
+import { updateOrganization, recalculateSalesNetValue } from '@/app/actions/organizations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { Check, ExternalLink, Unplug, Users, Loader2, ShoppingCart, Pencil } from 'lucide-react'
 import type { IntegrationWithType } from '@/types'
@@ -35,6 +45,9 @@ export default function ConfiguracoesPage() {
   const [editingTax, setEditingTax] = useState(false)
   const [taxRate, setTaxRate] = useState('')
   const [savingTax, setSavingTax] = useState(false)
+  const [showRecalculateDialog, setShowRecalculateDialog] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
+  const [pendingTaxRate, setPendingTaxRate] = useState<number | null>(null)
 
   // Mostrar toast baseado em query params (retorno do OAuth)
   useEffect(() => {
@@ -177,20 +190,49 @@ export default function ConfiguracoesPage() {
       return
     }
 
+    // Guarda a taxa pendente e abre o dialog
+    setPendingTaxRate(rate)
+    setShowRecalculateDialog(true)
+  }
+
+  async function handleConfirmTaxChange(recalculate: boolean) {
+    if (!organization || pendingTaxRate === null) return
+
     setSavingTax(true)
+    setShowRecalculateDialog(false)
+
     try {
+      // Primeiro salva a nova taxa
       const result = await updateOrganization(organization.id, {
-        tax_deduction_rate: rate,
+        tax_deduction_rate: pendingTaxRate,
       })
-      if (result.success) {
-        toast.success('Taxa de dedução atualizada')
-        setEditingTax(false)
-        refreshOrg()
-      } else {
+
+      if (!result.success) {
         toast.error(result.error)
+        return
       }
+
+      // Se pediu para recalcular, faz o recálculo
+      if (recalculate) {
+        setRecalculating(true)
+        const recalcResult = await recalculateSalesNetValue(organization.id)
+        setRecalculating(false)
+
+        if (recalcResult.success) {
+          toast.success(`Taxa atualizada e ${recalcResult.data.updated} vendas recalculadas`)
+        } else {
+          toast.error('Taxa salva, mas erro ao recalcular vendas')
+        }
+      } else {
+        toast.success('Taxa de dedução atualizada')
+      }
+
+      setEditingTax(false)
+      setPendingTaxRate(null)
+      refreshOrg()
     } finally {
       setSavingTax(false)
+      setRecalculating(false)
     }
   }
 
@@ -472,6 +514,39 @@ export default function ConfiguracoesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog de confirmação para recalcular vendas */}
+      <AlertDialog open={showRecalculateDialog} onOpenChange={setShowRecalculateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Recalcular vendas do mês atual?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A taxa de dedução será alterada para {pendingTaxRate}%. Deseja recalcular o valor líquido das vendas do mês atual com a nova taxa? Vendas de meses anteriores não serão afetadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => handleConfirmTaxChange(false)}
+              disabled={savingTax || recalculating}
+            >
+              Apenas salvar taxa
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleConfirmTaxChange(true)}
+              disabled={savingTax || recalculating}
+            >
+              {recalculating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Recalculando...
+                </>
+              ) : (
+                'Salvar e recalcular'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
