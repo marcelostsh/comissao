@@ -3,6 +3,8 @@ export type Sale = {
   organization_id: string
   seller_id: string
   external_id: string | null
+  integration_id: string | null
+  source_deleted_at: string | null
   client_name: string
   gross_value: number
   net_value: number
@@ -15,6 +17,7 @@ export type CreateSaleInput = {
   organization_id: string
   seller_id: string
   external_id?: string
+  integration_id?: string
   client_name: string
   gross_value: number
   net_value: number
@@ -31,6 +34,10 @@ export type SaleWithSeller = Sale & {
     id: string
     name: string
   }
+  integration?: {
+    id: string
+    type_name: string
+  } | null
 }
 
 // Sale com comissão (calculada on-the-fly ou fechada)

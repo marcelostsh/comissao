@@ -129,6 +129,24 @@ export async function deleteSale(id: string): Promise<ActionResult<void>> {
 }
 
 /**
+ * Deleta múltiplas vendas (e suas comissões associadas)
+ */
+export async function deleteSales(ids: string[]): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    let deleted = 0
+    for (const id of ids) {
+      await saleRepository.delete(id)
+      deleted++
+    }
+    revalidatePath('/vendas')
+    revalidatePath('/dashboard')
+    return { success: true, data: { deleted } }
+  } catch (err) {
+    return { success: false, error: 'Erro ao excluir vendas' }
+  }
+}
+
+/**
  * Conta vendas de um período
  */
 export async function countSalesByPeriod(

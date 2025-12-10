@@ -16,12 +16,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { Lock } from 'lucide-react'
+import { AlertTriangle, Lock } from 'lucide-react'
 import type { SaleWithCommission } from '@/types'
+
+type SelectionType = 'reverse' | 'delete'
 
 type Props = {
   sales: SaleWithCommission[]
   selectionMode?: boolean
+  selectionType?: SelectionType
   selectedIds?: Set<string>
   onSelectionChange?: (ids: Set<string>) => void
 }
@@ -41,11 +44,16 @@ function formatDate(dateStr: string): string {
 export function SalesTable({
   sales,
   selectionMode = false,
+  selectionType = 'reverse',
   selectedIds = new Set(),
   onSelectionChange,
 }: Props) {
-  // Vendas fechadas (elegíveis para seleção)
-  const closedSales = sales.filter((s) => s.commission?.is_closed)
+  // Vendas elegíveis dependem do tipo de seleção
+  // Estorno: apenas comissões fechadas
+  // Delete: todas as vendas (gestor tem liberdade total)
+  const eligibleSales = selectionType === 'reverse'
+    ? sales.filter((s) => s.commission?.is_closed)
+    : sales
 
   function handleToggle(saleId: string) {
     if (!onSelectionChange) return
@@ -60,12 +68,12 @@ export function SalesTable({
 
   function handleToggleAll() {
     if (!onSelectionChange) return
-    if (selectedIds.size === closedSales.length) {
+    if (selectedIds.size === eligibleSales.length) {
       // Desmarcar todos
       onSelectionChange(new Set())
     } else {
       // Marcar todos
-      onSelectionChange(new Set(closedSales.map((s) => s.id)))
+      onSelectionChange(new Set(eligibleSales.map((s) => s.id)))
     }
   }
 
@@ -77,8 +85,8 @@ export function SalesTable({
     )
   }
 
-  const allSelected = closedSales.length > 0 && selectedIds.size === closedSales.length
-  const someSelected = selectedIds.size > 0 && selectedIds.size < closedSales.length
+  const allSelected = eligibleSales.length > 0 && selectedIds.size === eligibleSales.length
+  const someSelected = selectedIds.size > 0 && selectedIds.size < eligibleSales.length
 
   return (
     <TooltipProvider>
@@ -107,6 +115,8 @@ export function SalesTable({
         <TableBody>
           {sales.map((sale) => {
             const isClosed = sale.commission?.is_closed
+            const isDeletedFromSource = !!sale.source_deleted_at
+            const isEligible = selectionType === 'reverse' ? isClosed : isDeletedFromSource
             const isSelected = selectedIds.has(sale.id)
 
             return (
@@ -116,7 +126,7 @@ export function SalesTable({
               >
                 {selectionMode && (
                   <TableCell>
-                    {isClosed ? (
+                    {isEligible ? (
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={() => handleToggle(sale.id)}
@@ -160,8 +170,49 @@ export function SalesTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  {sale.external_id ? (
-                    <Badge variant="outline">Pipedrive</Badge>
+                  {sale.integration ? (
+                    sale.source_deleted_at ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge className="cursor-help bg-amber-500/20 text-amber-600 border border-amber-500/40 hover:bg-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/40">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            {sale.integration.type_name.charAt(0).toUpperCase() + sale.integration.type_name.slice(1)}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent 
+                          side="left" 
+                          className="max-w-xs p-0 bg-zinc-900 dark:bg-zinc-900 border border-amber-500/50 shadow-lg shadow-amber-500/10"
+                        >
+                          <div className="px-3 py-2 border-b border-amber-500/30 bg-amber-500/10">
+                            <div className="flex items-center gap-2 text-amber-400 font-semibold text-sm">
+                              <AlertTriangle className="h-4 w-4" />
+                              Removida da origem
+                            </div>
+                          </div>
+                          <div className="px-3 py-2 space-y-2">
+                            <p className="text-zinc-200 text-sm">
+                              Esta venda não existe mais no {sale.integration.type_name.charAt(0).toUpperCase() + sale.integration.type_name.slice(1)}.
+                            </p>
+                            <div className="text-xs space-y-0.5 text-zinc-400">
+                              <p>
+                                <span className="text-zinc-500">Detectado:</span>{' '}
+                                {new Date(sale.source_deleted_at).toLocaleDateString('pt-BR')}
+                              </p>
+                              {sale.external_id && (
+                                <p>
+                                  <span className="text-zinc-500">ID original:</span>{' '}
+                                  {sale.external_id}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Badge variant="outline">
+                        {sale.integration.type_name.charAt(0).toUpperCase() + sale.integration.type_name.slice(1)}
+                      </Badge>
+                    )
                   ) : (
                     <Badge variant="secondary">Manual</Badge>
                   )}

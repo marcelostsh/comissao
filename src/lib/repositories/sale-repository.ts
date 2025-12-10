@@ -74,12 +74,26 @@ export const saleRepository = {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('sales')
-      .select('*, seller:sellers(id, name)')
+      .select(`
+        *,
+        seller:sellers(id, name),
+        integration:integrations(id, integration_type:integration_types(name))
+      `)
       .eq('organization_id', organizationId)
       .order('sale_date', { ascending: false })
 
     if (error) throw new Error(error.message)
-    return data as SaleWithSeller[]
+    
+    // Mapeia para incluir integration.type_name
+    return data.map((sale) => ({
+      ...sale,
+      integration: sale.integration
+        ? {
+            id: sale.integration.id,
+            type_name: sale.integration.integration_type?.name || 'unknown',
+          }
+        : null,
+    })) as SaleWithSeller[]
   },
 
   async findWithSellersByPeriod(organizationId: string, period: string): Promise<SaleWithSeller[]> {
@@ -90,14 +104,28 @@ export const saleRepository = {
 
     const { data, error } = await supabase
       .from('sales')
-      .select('*, seller:sellers(id, name)')
+      .select(`
+        *,
+        seller:sellers(id, name),
+        integration:integrations(id, integration_type:integration_types(name))
+      `)
       .eq('organization_id', organizationId)
       .gte('sale_date', startDate)
       .lte('sale_date', endDate)
       .order('sale_date', { ascending: false })
 
     if (error) throw new Error(error.message)
-    return data as SaleWithSeller[]
+    
+    // Mapeia para incluir integration.type_name
+    return data.map((sale) => ({
+      ...sale,
+      integration: sale.integration
+        ? {
+            id: sale.integration.id,
+            type_name: sale.integration.integration_type?.name || 'unknown',
+          }
+        : null,
+    })) as SaleWithSeller[]
   },
 
   async create(input: CreateSaleInput): Promise<Sale> {
@@ -177,6 +205,59 @@ export const saleRepository = {
 
     if (error) throw new Error(error.message)
     return count || 0
+  },
+
+  /**
+   * Busca external_ids de vendas ativas (não removidas) de uma integração
+   */
+  async getActiveExternalIdsByIntegration(integrationId: string): Promise<Set<string>> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('sales')
+      .select('external_id')
+      .eq('integration_id', integrationId)
+      .is('source_deleted_at', null)
+
+    if (error) throw new Error(error.message)
+    return new Set(data?.map((s) => s.external_id).filter(Boolean) as string[])
+  },
+
+  /**
+   * Marca vendas como removidas da origem
+   */
+  async markAsRemovedFromSource(externalIds: string[], integrationId: string): Promise<number> {
+    if (externalIds.length === 0) return 0
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('sales')
+      .update({ source_deleted_at: new Date().toISOString() })
+      .eq('integration_id', integrationId)
+      .in('external_id', externalIds)
+      .is('source_deleted_at', null)
+      .select('id')
+
+    if (error) throw new Error(error.message)
+    return data?.length || 0
+  },
+
+  /**
+   * Restaura vendas que voltaram a existir na origem
+   */
+  async restoreFromSource(externalIds: string[], integrationId: string): Promise<number> {
+    if (externalIds.length === 0) return 0
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('sales')
+      .update({ source_deleted_at: null })
+      .eq('integration_id', integrationId)
+      .in('external_id', externalIds)
+      .not('source_deleted_at', 'is', null)
+      .select('id')
+
+    if (error) throw new Error(error.message)
+    return data?.length || 0
   },
 }
 

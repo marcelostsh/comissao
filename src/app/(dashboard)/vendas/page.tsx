@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useOrganization } from '@/contexts/organization-context'
-import { forceSyncSales } from '@/app/actions/sales'
+import { forceSyncSales, deleteSales } from '@/app/actions/sales'
 import { getSalesWithCommissions, closePeriod, reverseCommissions } from '@/app/actions/commissions'
 import { SalesTable } from '@/components/sales'
 import { Button } from '@/components/ui/button'
@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { RefreshCw, Lock, RotateCcw, X, MoreVertical, ShoppingCart, DollarSign, Calculator } from 'lucide-react'
+import { RefreshCw, Lock, RotateCcw, X, MoreVertical, ShoppingCart, DollarSign, Calculator, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { SaleWithCommission } from '@/types'
 
@@ -72,11 +72,14 @@ export default function VendasPage() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const [period, setPeriod] = useState(getCurrentPeriod())
   
-  // Estado para modo de seleção (estorno)
-  const [selectionMode, setSelectionMode] = useState(false)
+  // Estado para modo de seleção (estorno ou delete)
+  type SelectionType = 'reverse' | 'delete' | null
+  const [selectionType, setSelectionType] = useState<SelectionType>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [reversing, setReversing] = useState(false)
   const [showReverseDialog, setShowReverseDialog] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const periods = generatePeriods()
 
@@ -89,7 +92,7 @@ export default function VendasPage() {
       setSales(data)
       // Limpa seleção ao recarregar
       setSelectedIds(new Set())
-      setSelectionMode(false)
+      setSelectionType(null)
     } finally {
       setLoading(false)
     }
@@ -163,8 +166,25 @@ export default function VendasPage() {
   }
 
   function handleCancelSelection() {
-    setSelectionMode(false)
+    setSelectionType(null)
     setSelectedIds(new Set())
+  }
+
+  async function handleDelete() {
+    if (selectedIds.size === 0) return
+    setDeleting(true)
+    try {
+      const result = await deleteSales(Array.from(selectedIds))
+      if (result.success) {
+        toast.success(`${result.data.deleted} venda(s) excluída(s)`)
+        await loadSales()
+      } else {
+        toast.error(result.error)
+      }
+    } finally {
+      setDeleting(false)
+      setShowDeleteDialog(false)
+    }
   }
 
   if (orgLoading) {
@@ -222,14 +242,14 @@ export default function VendasPage() {
           </Select>
           <Button
             onClick={() => setShowCloseDialog(true)}
-            disabled={closing || openSalesCount === 0 || selectionMode}
+            disabled={closing || openSalesCount === 0 || selectionType !== null}
           >
             <Lock className={`mr-2 h-4 w-4 ${closing ? 'animate-pulse' : ''}`} />
             {closing ? 'Fechando...' : 'Fechar Período'}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" disabled={selectionMode}>
+              <Button variant="outline" size="icon" disabled={selectionType !== null}>
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -239,9 +259,15 @@ export default function VendasPage() {
                 {syncing ? 'Sincronizando...' : 'Sincronizar vendas'}
               </DropdownMenuItem>
               {closedSalesCount > 0 && (
-                <DropdownMenuItem onClick={() => setSelectionMode(true)}>
+                <DropdownMenuItem onClick={() => setSelectionType('reverse')}>
                   <RotateCcw className="mr-2 h-4 w-4" />
                   Estornar comissões
+                </DropdownMenuItem>
+              )}
+              {sales.length > 0 && (
+                <DropdownMenuItem onClick={() => setSelectionType('delete')}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir vendas
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -329,12 +355,12 @@ export default function VendasPage() {
             <div>
               <CardTitle>Lista de Vendas</CardTitle>
               <CardDescription>
-                {selectionMode
-                  ? 'Selecione as comissões para estornar'
-                  : 'Vendas do período selecionado'}
+                {selectionType === 'reverse' && 'Selecione as comissões para estornar'}
+                {selectionType === 'delete' && 'Selecione as vendas para excluir'}
+                {!selectionType && 'Vendas do período selecionado'}
               </CardDescription>
             </div>
-            {selectionMode && (
+            {selectionType === 'reverse' && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
                   {selectedIds.size} selecionada(s)
@@ -357,6 +383,30 @@ export default function VendasPage() {
                 </Button>
               </div>
             )}
+            {selectionType === 'delete' && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedIds.size} selecionada(s)
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelSelection}
+                >
+                  <X className="mr-1 h-4 w-4" />
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={selectedIds.size === 0 || deleting}
+                >
+                  <Trash2 className={`mr-1 h-4 w-4 ${deleting ? 'animate-pulse' : ''}`} />
+                  {deleting ? 'Excluindo...' : 'Confirmar Exclusão'}
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -369,7 +419,8 @@ export default function VendasPage() {
           ) : (
             <SalesTable
               sales={sales}
-              selectionMode={selectionMode}
+              selectionMode={selectionType !== null}
+              selectionType={selectionType || 'reverse'}
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
             />
@@ -410,6 +461,28 @@ export default function VendasPage() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleReverse} disabled={reversing}>
               {reversing ? 'Estornando...' : 'Confirmar Estorno'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Vendas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá excluir permanentemente {selectedIds.size} venda(s) 
+              e suas comissões associadas. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Excluindo...' : 'Confirmar Exclusão'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

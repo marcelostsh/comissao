@@ -40,5 +40,6 @@ export type SyncResult = {
   synced: number
   skipped: number
   errors: number
+  removed_from_source: number
 }
 

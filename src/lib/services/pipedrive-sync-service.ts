@@ -102,14 +102,24 @@ export const pipedriveSyncService = {
    * - Faz match de user_id (Pipedrive) com pipedrive_id (seller)
    * - Aplica tax_deduction_rate para calcular net_value
    * - Só importa deals de vendedores ativos cadastrados
+   * - Marca vendas removidas do Pipedrive
    */
   async syncWonDeals(organizationId: string, force: boolean = false): Promise<SyncResult> {
     // Verifica throttle (a menos que force=true)
     if (!force) {
       const needs = await this.needsSync(organizationId)
       if (!needs) {
-        return { synced: 0, skipped: 0, errors: 0 }
+        return { synced: 0, skipped: 0, errors: 0, removed_from_source: 0 }
       }
+    }
+
+    // Buscar integração do Pipedrive
+    const integration = await integrationRepository.findByOrganizationAndType(
+      organizationId,
+      'pipedrive'
+    )
+    if (!integration) {
+      throw new Error('Pipedrive integration not found')
     }
 
     const client = await this.getClient(organizationId)
@@ -143,24 +153,37 @@ export const pipedriveSyncService = {
     // Se não há vendedores com pipedrive_id, não há o que sincronizar
     if (sellersByPipedriveId.size === 0) {
       await this.updateLastSyncedAt(organizationId)
-      return { synced: 0, skipped: 0, errors: 0 }
+      return { synced: 0, skipped: 0, errors: 0, removed_from_source: 0 }
     }
 
     // Buscar todos os deals ganhos
     const deals = await client.getAllWonDeals()
     console.log('[sync] deals fetched', { total: deals.length })
 
-    if (deals.length === 0) {
-      await this.updateLastSyncedAt(organizationId)
-      return { synced: 0, skipped: 0, errors: 0 }
-    }
-
     // Buscar external_ids já existentes
     const externalIds = deals.map((d) => String(d.id))
     const existingIds = await saleRepository.getExistingExternalIds(organizationId, externalIds)
     console.log('[sync] existing external ids', { count: existingIds.size })
 
-    // Filtrar e transformar deals
+    // Detectar vendas removidas do Pipedrive
+    const activeLocalIds = await saleRepository.getActiveExternalIdsByIntegration(integration.id)
+    const pipedriveIds = new Set(externalIds)
+    const removedIds = Array.from(activeLocalIds).filter((id) => !pipedriveIds.has(id))
+    
+    let removedFromSource = 0
+    if (removedIds.length > 0) {
+      console.log('[sync] marking as removed from source', { count: removedIds.length })
+      removedFromSource = await saleRepository.markAsRemovedFromSource(removedIds, integration.id)
+    }
+
+    // Restaurar vendas que voltaram a existir
+    const restoredIds = externalIds.filter((id) => !activeLocalIds.has(id) && existingIds.has(id))
+    if (restoredIds.length > 0) {
+      console.log('[sync] restoring from source', { count: restoredIds.length })
+      await saleRepository.restoreFromSource(restoredIds, integration.id)
+    }
+
+    // Filtrar e transformar deals novos
     const salesToInsert: CreateSaleInput[] = []
     let skipped = 0
     let errors = 0
@@ -171,7 +194,6 @@ export const pipedriveSyncService = {
       // Skip se já existe
       if (existingIds.has(externalId)) {
         skipped++
-        console.log('[sync] skipped (already exists)', { externalId })
         continue
       }
 
@@ -183,7 +205,6 @@ export const pipedriveSyncService = {
       const sellerId = sellersByPipedriveId.get(pipedriveUserId)
       if (!sellerId) {
         skipped++
-        debugger
         console.log('[sync] skipped (no seller match)', {
           externalId,
           userId: deal.user_id,
@@ -205,6 +226,7 @@ export const pipedriveSyncService = {
         organization_id: organizationId,
         seller_id: sellerId,
         external_id: externalId,
+        integration_id: integration.id,
         client_name: deal.title,
         gross_value: grossValue,
         net_value: netValue,
@@ -229,6 +251,7 @@ export const pipedriveSyncService = {
       synced: errors > 0 ? 0 : salesToInsert.length,
       skipped,
       errors,
+      removed_from_source: removedFromSource,
     }
   },
 
