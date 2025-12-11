@@ -156,3 +156,22 @@ export async function countSalesByPeriod(
   return saleRepository.countByPeriod(organizationId, period)
 }
 
+/**
+ * Retorna períodos distintos com vendas (para filtro)
+ */
+export async function getSalesPeriods(
+  organizationId: string
+): Promise<{ value: string; label: string }[]> {
+  const periods = await saleRepository.getDistinctPeriods(organizationId)
+  
+  return periods.map((period) => {
+    const [year, month] = period.split('-').map(Number)
+    const date = new Date(year, month - 1, 1)
+    const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date)
+    return {
+      value: period,
+      label: label.charAt(0).toUpperCase() + label.slice(1),
+    }
+  })
+}
+

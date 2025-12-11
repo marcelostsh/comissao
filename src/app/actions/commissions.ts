@@ -94,6 +94,35 @@ export async function getSalesWithCommissions(
 }
 
 /**
+ * Retorna vendas do período com comissões - PAGINADO
+ */
+export async function getSalesWithCommissionsPaginated(
+  organizationId: string,
+  period: string,
+  page: number,
+  pageSize: number
+): Promise<{ data: SaleWithCommission[]; total: number }> {
+  return commissionService.getSalesWithCommissionsPaginated(organizationId, period, page, pageSize)
+}
+
+/**
+ * Retorna totais do período (para cards de resumo)
+ */
+export async function getPeriodTotals(
+  organizationId: string,
+  period: string
+): Promise<{
+  count: number
+  gross: number
+  net: number
+  commission: number
+  openCount: number
+  closedCount: number
+}> {
+  return commissionService.getPeriodTotals(organizationId, period)
+}
+
+/**
  * Fecha período - persiste comissões de todas as vendas abertas
  * Ação irreversível: valores são travados
  */

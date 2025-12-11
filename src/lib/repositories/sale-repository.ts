@@ -128,6 +128,48 @@ export const saleRepository = {
     })) as SaleWithSeller[]
   },
 
+  async findWithSellersByPeriodPaginated(
+    organizationId: string,
+    period: string,
+    page: number,
+    pageSize: number
+  ): Promise<{ data: SaleWithSeller[]; total: number }> {
+    const supabase = await createClient()
+    const startDate = `${period}-01`
+    const [year, month] = period.split('-').map(Number)
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0]
+
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error, count } = await supabase
+      .from('sales')
+      .select(`
+        *,
+        seller:sellers(id, name),
+        integration:integrations(id, integration_type:integration_types(name))
+      `, { count: 'exact' })
+      .eq('organization_id', organizationId)
+      .gte('sale_date', startDate)
+      .lte('sale_date', endDate)
+      .order('sale_date', { ascending: false })
+      .range(from, to)
+
+    if (error) throw new Error(error.message)
+    
+    const mapped = data.map((sale) => ({
+      ...sale,
+      integration: sale.integration
+        ? {
+            id: sale.integration.id,
+            type_name: sale.integration.integration_type?.name || 'unknown',
+          }
+        : null,
+    })) as SaleWithSeller[]
+
+    return { data: mapped, total: count || 0 }
+  },
+
   async create(input: CreateSaleInput): Promise<Sale> {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -258,6 +300,33 @@ export const saleRepository = {
 
     if (error) throw new Error(error.message)
     return data?.length || 0
+  },
+
+  /**
+   * Retorna períodos distintos (YYYY-MM) com vendas
+   */
+  async getDistinctPeriods(organizationId: string): Promise<string[]> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('sales')
+      .select('sale_date')
+      .eq('organization_id', organizationId)
+      .order('sale_date', { ascending: false })
+
+    if (error) throw new Error(error.message)
+    if (!data || data.length === 0) return []
+
+    // Extrai períodos únicos (YYYY-MM)
+    const periodsSet = new Set<string>()
+    for (const sale of data) {
+      if (sale.sale_date) {
+        const period = sale.sale_date.substring(0, 7) // "2024-06"
+        periodsSet.add(period)
+      }
+    }
+
+    // Retorna ordenado do mais recente ao mais antigo
+    return Array.from(periodsSet).sort((a, b) => b.localeCompare(a))
   },
 }
 

@@ -258,6 +258,39 @@ export const commissionService = {
     // 1. Busca vendas do período com dados do vendedor
     const sales = await saleRepository.findWithSellersByPeriod(organizationId, period)
 
+    return this.processSalesWithCommissions(sales, organizationId, period)
+  },
+
+  /**
+   * Retorna vendas do período com comissões - PAGINADO
+   */
+  async getSalesWithCommissionsPaginated(
+    organizationId: string,
+    period: string,
+    page: number,
+    pageSize: number
+  ): Promise<{ data: SaleWithCommission[]; total: number }> {
+    const { data: sales, total } = await saleRepository.findWithSellersByPeriodPaginated(
+      organizationId,
+      period,
+      page,
+      pageSize
+    )
+
+    const result = await this.processSalesWithCommissions(sales, organizationId, period)
+    return { data: result, total }
+  },
+
+  /**
+   * Processa vendas com comissões (lógica compartilhada)
+   */
+  async processSalesWithCommissions(
+    sales: Awaited<ReturnType<typeof saleRepository.findWithSellersByPeriod>>,
+    organizationId: string,
+    period: string
+  ): Promise<SaleWithCommission[]> {
+    if (sales.length === 0) return []
+
     // 2. Busca comissões existentes (fechadas)
     const closedCommissions = await commissionRepository.findByPeriod(organizationId, period)
     const commissionMap = new Map(closedCommissions.map((c) => [c.sale_id, c]))
@@ -333,6 +366,46 @@ export const commissionService = {
     }
 
     return result
+  },
+
+  /**
+   * Retorna totais do período (para cards de resumo)
+   * Não paginado - calcula sobre todas as vendas
+   */
+  async getPeriodTotals(
+    organizationId: string,
+    period: string
+  ): Promise<{
+    count: number
+    gross: number
+    net: number
+    commission: number
+    openCount: number
+    closedCount: number
+  }> {
+    const sales = await this.getSalesWithCommissions(organizationId, period)
+
+    let openCount = 0
+    let closedCount = 0
+
+    const result = sales.reduce(
+      (acc, sale) => {
+        if (sale.commission?.is_closed) {
+          closedCount++
+        } else if (sale.commission) {
+          openCount++
+        }
+        return {
+          count: acc.count + 1,
+          gross: acc.gross + sale.gross_value,
+          net: acc.net + sale.net_value,
+          commission: acc.commission + (sale.commission?.amount ?? 0),
+        }
+      },
+      { count: 0, gross: 0, net: 0, commission: 0 }
+    )
+
+    return { ...result, openCount, closedCount }
   },
 
   /**
