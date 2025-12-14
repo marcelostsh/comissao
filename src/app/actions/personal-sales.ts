@@ -120,7 +120,7 @@ export async function createPersonalSale(
 ): Promise<ActionResult<PersonalSaleWithItems>> {
   const parsed = createSaleSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message }
+    return { success: false, error: parsed.error.issues[0].message }
   }
 
   try {
@@ -231,6 +231,143 @@ export async function createPersonalSale(
   } catch (err) {
     console.error('Error creating sale:', err)
     return { success: false, error: 'Erro ao criar venda' }
+  }
+}
+
+export async function updatePersonalSale(
+  id: string,
+  input: CreatePersonalSaleInput
+): Promise<ActionResult<PersonalSaleWithItems>> {
+  const parsed = createSaleSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: 'Usuário não autenticado' }
+    }
+
+    // Verificar se a venda existe e pertence ao usuário
+    const { data: existingSale, error: existingError } = await supabase
+      .from('personal_sales')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (existingError || !existingSale) {
+      return { success: false, error: 'Venda não encontrada' }
+    }
+
+    const { supplier_id, client_id, client_name, sale_date, payment_condition, notes, items } = parsed.data
+
+    // Calcular totais
+    const itemsWithTotal = items.map(item => ({
+      ...item,
+      total_price: item.quantity * item.unit_price,
+    }))
+    const grossValue = itemsWithTotal.reduce((sum, item) => sum + item.total_price, 0)
+
+    // Buscar regra de comissão do fornecedor
+    const { data: supplier, error: supplierError } = await supabase
+      .from('personal_suppliers')
+      .select('commission_rule_id')
+      .eq('id', supplier_id)
+      .single()
+
+    if (supplierError) throw supplierError
+
+    let commissionValue = 0
+    let commissionRate = 0
+
+    if (supplier.commission_rule_id) {
+      const { data: rule, error: ruleError } = await supabase
+        .from('commission_rules')
+        .select('type, percentage, tiers')
+        .eq('id', supplier.commission_rule_id)
+        .single()
+
+      if (!ruleError && rule) {
+        const result = commissionEngine.calculate({
+          netValue: grossValue,
+          rule: {
+            type: rule.type as 'fixed' | 'tiered',
+            percentage: rule.percentage,
+            tiers: rule.tiers,
+          },
+        })
+        commissionValue = result.amount
+        commissionRate = result.percentageApplied
+      }
+    }
+
+    // Atualizar venda
+    const { data: sale, error: saleError } = await supabase
+      .from('personal_sales')
+      .update({
+        supplier_id,
+        client_id,
+        client_name,
+        sale_date,
+        payment_condition: payment_condition || null,
+        notes: notes || null,
+        gross_value: grossValue,
+        net_value: grossValue,
+        commission_value: commissionValue,
+        commission_rate: commissionRate,
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select(`
+        *,
+        supplier:personal_suppliers(id, name),
+        client:personal_clients(id, name)
+      `)
+      .single()
+
+    if (saleError) throw saleError
+
+    // Deletar itens antigos
+    const { error: deleteItemsError } = await supabase
+      .from('personal_sale_items')
+      .delete()
+      .eq('personal_sale_id', id)
+
+    if (deleteItemsError) throw deleteItemsError
+
+    // Criar novos itens
+    const itemsToInsert = itemsWithTotal.map(item => ({
+      personal_sale_id: sale.id,
+      product_id: item.product_id || null,
+      product_name: item.product_name,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+    }))
+
+    const { data: insertedItems, error: itemsError } = await supabase
+      .from('personal_sale_items')
+      .insert(itemsToInsert)
+      .select()
+
+    if (itemsError) throw itemsError
+
+    revalidatePath('/minhasvendas')
+    revalidatePath(`/minhasvendas/${id}`)
+    return {
+      success: true,
+      data: {
+        ...sale,
+        items: insertedItems || [],
+      },
+    }
+  } catch (err) {
+    console.error('Error updating sale:', err)
+    return { success: false, error: 'Erro ao atualizar venda' }
   }
 }
 

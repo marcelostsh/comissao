@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Pencil } from 'lucide-react'
 import { getPersonalSaleById } from '@/app/actions/personal-sales'
 
 type Props = {
@@ -40,18 +40,26 @@ export default async function VendaDetalhePage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/minhasvendas">
-            <ArrowLeft className="h-4 w-4" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/minhasvendas">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Detalhes da Venda</h1>
+            <p className="text-muted-foreground">
+              {sale.client_name} - {formatDate(sale.sale_date)}
+            </p>
+          </div>
+        </div>
+        <Button asChild>
+          <Link href={`/minhasvendas/${id}/editar`}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
           </Link>
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Detalhes da Venda</h1>
-          <p className="text-muted-foreground">
-            {sale.client_name} - {formatDate(sale.sale_date)}
-          </p>
-        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

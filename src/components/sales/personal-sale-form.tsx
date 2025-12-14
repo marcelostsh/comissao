@@ -21,33 +21,69 @@ import { Plus, Eye } from 'lucide-react'
 import { SaleItemsEditor } from './sale-items-editor'
 import { InstallmentsSheet } from './installments-sheet'
 import { ClientCombobox, ClientDialog } from '@/components/clients'
-import { createPersonalSale } from '@/app/actions/personal-sales'
+import { createPersonalSale, updatePersonalSale } from '@/app/actions/personal-sales'
 import { toast } from 'sonner'
 import type { PersonalSupplierWithRule } from '@/app/actions/personal-suppliers'
 import type { Product, PersonalClient } from '@/types'
-import type { CreatePersonalSaleItemInput } from '@/types/personal-sale'
+import type { CreatePersonalSaleItemInput, PersonalSaleWithItems } from '@/types/personal-sale'
 
 type SaleItem = CreatePersonalSaleItemInput & { id: string }
 
 type Props = {
   suppliers: PersonalSupplierWithRule[]
   productsBySupplier: Record<string, Product[]>
+  sale?: PersonalSaleWithItems
+  mode?: 'create' | 'edit'
 }
 
-export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
+function parsePaymentCondition(condition: string | null): { type: 'vista' | 'parcelado'; installments: number; interval: number } {
+  if (!condition || condition.trim() === '') {
+    return { type: 'vista', installments: 3, interval: 30 }
+  }
+
+  const parts = condition.split('/').map(p => parseInt(p.trim())).filter(n => !isNaN(n))
+  if (parts.length === 0) {
+    return { type: 'vista', installments: 3, interval: 30 }
+  }
+
+  // Detectar intervalo (diferença entre parcelas consecutivas)
+  const interval = parts.length > 1 ? parts[1] - parts[0] : parts[0]
+  return {
+    type: 'parcelado',
+    installments: parts.length,
+    interval: interval > 0 ? interval : 30,
+  }
+}
+
+export function PersonalSaleForm({ suppliers, productsBySupplier, sale, mode = 'create' }: Props) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const isEdit = mode === 'edit' && !!sale
+
+  // Parse condição de pagamento inicial
+  const initialPayment = parsePaymentCondition(sale?.payment_condition ?? null)
 
   // Form state
-  const [supplierId, setSupplierId] = useState('')
-  const [clientId, setClientId] = useState<string | null>(null)
-  const [clientName, setClientName] = useState('')
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
-  const [paymentType, setPaymentType] = useState<'vista' | 'parcelado'>('vista')
-  const [installments, setInstallments] = useState(3)
-  const [interval, setInterval] = useState(30)
-  const [notes, setNotes] = useState('')
-  const [items, setItems] = useState<SaleItem[]>([])
+  const [supplierId, setSupplierId] = useState(sale?.supplier_id || '')
+  const [clientId, setClientId] = useState<string | null>(sale?.client_id || null)
+  const [clientName, setClientName] = useState(sale?.client_name || '')
+  const [saleDate, setSaleDate] = useState(sale?.sale_date || new Date().toISOString().split('T')[0])
+  const [paymentType, setPaymentType] = useState<'vista' | 'parcelado'>(initialPayment.type)
+  const [installments, setInstallments] = useState(initialPayment.installments)
+  const [interval, setInterval] = useState(initialPayment.interval)
+  const [notes, setNotes] = useState(sale?.notes || '')
+  const [items, setItems] = useState<SaleItem[]>(() => {
+    if (sale?.items && sale.items.length > 0) {
+      return sale.items.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+      }))
+    }
+    return []
+  })
 
   // Calcula a condição de pagamento baseado nos inputs
   const paymentCondition = paymentType === 'vista'
@@ -125,7 +161,7 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
     setSaving(true)
 
     try {
-      const result = await createPersonalSale({
+      const payload = {
         supplier_id: supplierId,
         client_id: clientId,
         client_name: clientName,
@@ -138,10 +174,14 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
           quantity,
           unit_price,
         })),
-      })
+      }
+
+      const result = isEdit
+        ? await updatePersonalSale(sale.id, payload)
+        : await createPersonalSale(payload)
 
       if (result.success) {
-        toast.success('Venda cadastrada')
+        toast.success(isEdit ? 'Venda atualizada' : 'Venda cadastrada')
         router.push('/minhasvendas')
       } else {
         toast.error(result.error)
@@ -156,8 +196,11 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
   }
 
   function handleSupplierChange(value: string) {
+    const shouldClearItems = supplierId !== '' && value !== supplierId
     setSupplierId(value)
-    setItems([])
+    if (shouldClearItems) {
+      setItems([])
+    }
   }
 
   function handleClientChange(id: string | null, name: string) {
@@ -380,7 +423,7 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
             Cancelar
           </Button>
           <Button type="submit" disabled={saving}>
-            {saving ? 'Salvando...' : 'Salvar Venda'}
+            {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Salvar Venda'}
           </Button>
         </div>
       </form>
