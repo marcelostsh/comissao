@@ -17,11 +17,11 @@ import {
 } from '@/components/ui/select'
 import { Plus } from 'lucide-react'
 import { SaleItemsEditor } from './sale-items-editor'
-import { ClientCombobox } from '@/components/clients'
+import { ClientCombobox, ClientDialog } from '@/components/clients'
 import { createPersonalSale } from '@/app/actions/personal-sales'
 import { toast } from 'sonner'
 import type { PersonalSupplierWithRule } from '@/app/actions/personal-suppliers'
-import type { Product } from '@/types'
+import type { Product, PersonalClient } from '@/types'
 import type { CreatePersonalSaleItemInput } from '@/types/personal-sale'
 
 type SaleItem = CreatePersonalSaleItemInput & { id: string }
@@ -43,6 +43,10 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
   const [paymentCondition, setPaymentCondition] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<SaleItem[]>([])
+
+  // Client dialog state
+  const [clientDialogOpen, setClientDialogOpen] = useState(false)
+  const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0)
 
   const selectedProducts = supplierId ? (productsBySupplier[supplierId] || []) : []
 
@@ -103,7 +107,6 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
     router.push('/minhasvendas')
   }
 
-  // Reset items when supplier changes
   function handleSupplierChange(value: string) {
     setSupplierId(value)
     setItems([])
@@ -114,120 +117,145 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
     setClientName(name)
   }
 
+  function handleClientCreated(client: PersonalClient) {
+    setClientId(client.id)
+    setClientName(client.name)
+    setClientRefreshTrigger((prev) => prev + 1)
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Dados da Venda */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Dados da Venda</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="supplier">Fornecedor *</Label>
-              <div className="flex gap-2">
-                <Select value={supplierId} onValueChange={handleSupplierChange}>
-                  <SelectTrigger id="supplier" className="flex-1">
-                    <SelectValue placeholder="Selecione o fornecedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button type="button" variant="outline" size="icon" asChild>
-                  <Link href="/fornecedores/novo">
-                    <Plus className="h-4 w-4" />
-                  </Link>
-                </Button>
+    <>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Dados da Venda */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Dados da Venda</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="supplier">Fornecedor *</Label>
+                <div className="flex gap-2">
+                  <Select value={supplierId} onValueChange={handleSupplierChange}>
+                    <SelectTrigger id="supplier" className="flex-1">
+                      <SelectValue placeholder="Selecione o fornecedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" size="icon" asChild>
+                    <Link href="/fornecedores/novo">
+                      <Plus className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Cliente *</Label>
-              <ClientCombobox
-                value={clientId}
-                onChange={handleClientChange}
-                placeholder="Pesquisar ou criar cliente..."
-                className="w-full"
+              <div className="space-y-2">
+                <Label>Cliente *</Label>
+                <div className="flex gap-2">
+                  <ClientCombobox
+                    value={clientId}
+                    onChange={handleClientChange}
+                    placeholder="Selecionar cliente..."
+                    className="flex-1"
+                    refreshTrigger={clientRefreshTrigger}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setClientDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="date">Data da Venda *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={saleDate}
+                  onChange={(e) => setSaleDate(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment">Condição de Pagamento</Label>
+                <Input
+                  id="payment"
+                  value={paymentCondition}
+                  onChange={(e) => setPaymentCondition(e.target.value)}
+                  placeholder="Ex: 30/60/90"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Informe os prazos separados por barra
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Observações */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Observações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Anotações sobre a venda..."
+                rows={8}
               />
-            </div>
+            </CardContent>
+          </Card>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="date">Data da Venda *</Label>
-              <Input
-                id="date"
-                type="date"
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="payment">Condição de Pagamento</Label>
-              <Input
-                id="payment"
-                value={paymentCondition}
-                onChange={(e) => setPaymentCondition(e.target.value)}
-                placeholder="Ex: 30/60/90"
-              />
-              <p className="text-xs text-muted-foreground">
-                Informe os prazos separados por barra
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Observações */}
+        {/* Itens */}
         <Card>
           <CardHeader>
-            <CardTitle>Observações</CardTitle>
+            <CardTitle>Itens da Venda</CardTitle>
           </CardHeader>
           <CardContent>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Anotações sobre a venda..."
-              rows={8}
-            />
+            {!supplierId ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  Selecione um fornecedor para adicionar itens
+                </p>
+              </div>
+            ) : (
+              <SaleItemsEditor
+                products={selectedProducts}
+                value={items}
+                onChange={setItems}
+              />
+            )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Itens */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Itens da Venda</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!supplierId ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">
-                Selecione um fornecedor para adicionar itens
-              </p>
-            </div>
-          ) : (
-            <SaleItemsEditor
-              products={selectedProducts}
-              value={items}
-              onChange={setItems}
-            />
-          )}
-        </CardContent>
-      </Card>
+        {/* Actions */}
+        <div className="flex justify-end gap-4">
+          <Button type="button" variant="outline" onClick={handleCancel} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? 'Salvando...' : 'Salvar Venda'}
+          </Button>
+        </div>
+      </form>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={handleCancel} disabled={saving}>
-          Cancelar
-        </Button>
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Salvando...' : 'Salvar Venda'}
-        </Button>
-      </div>
-    </form>
+      <ClientDialog
+        open={clientDialogOpen}
+        onOpenChange={setClientDialogOpen}
+        onSuccess={handleClientCreated}
+      />
+    </>
   )
 }
