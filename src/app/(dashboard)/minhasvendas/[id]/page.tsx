@@ -1,0 +1,156 @@
+import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { ArrowLeft } from 'lucide-react'
+import { getPersonalSaleById } from '@/app/actions/personal-sales'
+
+type Props = {
+  params: Promise<{ id: string }>
+}
+
+function formatCurrency(value: number | null): string {
+  if (value === null) return '-'
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value)
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '-'
+  return new Intl.DateTimeFormat('pt-BR').format(new Date(dateStr))
+}
+
+export default async function VendaDetalhePage({ params }: Props) {
+  const { id } = await params
+  const sale = await getPersonalSaleById(id)
+
+  if (!sale) {
+    notFound()
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/minhasvendas">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Detalhes da Venda</h1>
+          <p className="text-muted-foreground">
+            {sale.client_name} - {formatDate(sale.sale_date)}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Informações Gerais */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Informações Gerais</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Fornecedor</p>
+                <p className="font-medium">{sale.supplier?.name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Cliente</p>
+                <p className="font-medium">{sale.client_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Data da Venda</p>
+                <p className="font-medium">{formatDate(sale.sale_date)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Condição de Pagamento</p>
+                <p className="font-medium">{sale.payment_condition || '-'}</p>
+              </div>
+            </div>
+            {sale.notes && (
+              <div>
+                <p className="text-sm text-muted-foreground">Observações</p>
+                <p className="text-sm mt-1">{sale.notes}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Valores */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Valores</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-muted-foreground">Valor Bruto</span>
+                <span className="font-mono text-lg">{formatCurrency(sale.gross_value)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-muted-foreground">Valor Líquido</span>
+                <span className="font-mono text-lg">{formatCurrency(sale.net_value)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-muted-foreground">
+                  Comissão ({sale.commission_rate?.toFixed(2) || 0}%)
+                </span>
+                <span className="font-mono text-lg text-green-600 font-bold">
+                  {formatCurrency(sale.commission_value)}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Itens */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Itens da Venda</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Quantidade</TableHead>
+                  <TableHead className="text-right">Preço Unitário</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sale.items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.product_name}</TableCell>
+                    <TableCell className="text-right font-mono">{item.quantity}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(item.unit_price)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(item.total_price)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+

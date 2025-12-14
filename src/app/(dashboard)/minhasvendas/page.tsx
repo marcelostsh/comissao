@@ -1,37 +1,30 @@
-'use client'
-
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Plus, ShoppingCart } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { getPersonalSales } from '@/app/actions/personal-sales'
+import { PersonalSaleTable } from '@/components/sales'
 
-export default function MinhasVendasPage() {
+export default async function MinhasVendasPage() {
+  const sales = await getPersonalSales()
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Minhas Vendas</h1>
-          <p className="text-muted-foreground">Registro de pedidos faturados</p>
+          <h1 className="text-2xl font-bold">Minhas Vendas</h1>
+          <p className="text-muted-foreground">
+            Gerencie suas vendas e acompanhe suas comissões
+          </p>
         </div>
-        <Button size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Venda
+        <Button asChild>
+          <Link href="/minhasvendas/nova">
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Venda
+          </Link>
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <ShoppingCart className="mb-4 h-12 w-12 text-muted-foreground/50" />
-          <h3 className="font-semibold">Nenhuma venda cadastrada</h3>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Registre suas vendas para acompanhar suas comissões e recebíveis.
-          </p>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Registrar Venda
-          </Button>
-        </CardContent>
-      </Card>
+      <PersonalSaleTable sales={sales} />
     </div>
   )
 }
-
