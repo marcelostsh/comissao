@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Plus } from 'lucide-react'
 import { SaleItemsEditor } from './sale-items-editor'
 import { ClientCombobox, ClientDialog } from '@/components/clients'
@@ -40,9 +41,16 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
   const [clientId, setClientId] = useState<string | null>(null)
   const [clientName, setClientName] = useState('')
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
-  const [paymentCondition, setPaymentCondition] = useState('')
+  const [paymentType, setPaymentType] = useState<'vista' | 'parcelado'>('vista')
+  const [installments, setInstallments] = useState(3)
+  const [interval, setInterval] = useState(30)
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<SaleItem[]>([])
+
+  // Calcula a condição de pagamento baseado nos inputs
+  const paymentCondition = paymentType === 'vista'
+    ? ''
+    : Array.from({ length: installments }, (_, i) => (i + 1) * interval).join('/')
 
   // Client dialog state
   const [clientDialogOpen, setClientDialogOpen] = useState(false)
@@ -187,17 +195,60 @@ export function PersonalSaleForm({ suppliers, productsBySupplier }: Props) {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="payment">Condição de Pagamento</Label>
-                <Input
-                  id="payment"
-                  value={paymentCondition}
-                  onChange={(e) => setPaymentCondition(e.target.value)}
-                  placeholder="Ex: 30/60/90"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Informe os prazos separados por barra
-                </p>
+              <div className="space-y-3">
+                <Label>Pagamento</Label>
+                <RadioGroup
+                  value={paymentType}
+                  onValueChange={(v) => setPaymentType(v as 'vista' | 'parcelado')}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="vista" id="vista" />
+                    <Label htmlFor="vista" className="font-normal cursor-pointer">
+                      À vista
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="parcelado" id="parcelado" />
+                    <Label htmlFor="parcelado" className="font-normal cursor-pointer">
+                      Parcelado
+                    </Label>
+                  </div>
+                </RadioGroup>
+
+                {paymentType === 'parcelado' && (
+                  <div className="space-y-3 pt-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="installments" className="text-xs">
+                          Parcelas
+                        </Label>
+                        <Input
+                          id="installments"
+                          type="number"
+                          min={1}
+                          value={installments}
+                          onChange={(e) => setInstallments(Math.max(1, parseInt(e.target.value) || 1))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="interval" className="text-xs">
+                          Intervalo (dias)
+                        </Label>
+                        <Input
+                          id="interval"
+                          type="number"
+                          min={1}
+                          value={interval}
+                          onChange={(e) => setInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {paymentCondition}
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
