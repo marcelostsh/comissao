@@ -103,7 +103,8 @@ export async function getReceivablesStats(): Promise<ReceivablesStats> {
 export async function markReceivableAsReceived(
   personalSaleId: string,
   installmentNumber: number,
-  receivedAmount: number
+  receivedAmount: number,
+  receivedAt?: string
 ): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient()
@@ -113,6 +114,8 @@ export async function markReceivableAsReceived(
       return { success: false, error: 'Usuário não autenticado' }
     }
 
+    const finalReceivedAt = receivedAt || new Date().toISOString()
+
     // Inserir marcação de recebimento
     const { error } = await supabase
       .from('received_payments')
@@ -121,7 +124,7 @@ export async function markReceivableAsReceived(
         personal_sale_id: personalSaleId,
         installment_number: installmentNumber,
         received_amount: receivedAmount,
-        received_at: new Date().toISOString(),
+        received_at: finalReceivedAt,
       })
 
     if (error) {
@@ -131,7 +134,7 @@ export async function markReceivableAsReceived(
           .from('received_payments')
           .update({
             received_amount: receivedAmount,
-            received_at: new Date().toISOString(),
+            received_at: finalReceivedAt,
           })
           .eq('personal_sale_id', personalSaleId)
           .eq('installment_number', installmentNumber)
