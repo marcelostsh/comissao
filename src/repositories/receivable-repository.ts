@@ -7,9 +7,11 @@ export type Receivable = {
   supplier_id: string | null
   due_date: string
   expected_amount: number | null
+  installment_value: number | null
   received_amount: number | null
   status: 'pending' | 'received' | 'overdue' | 'partial'
   received_at: string | null
+  notes: string | null
   created_at: string
   sale?: {
     id: string
@@ -26,12 +28,14 @@ export type CreateReceivableInput = {
   supplier_id?: string
   due_date: string
   expected_amount: number
+  installment_value: number
 }
 
 export type UpdateReceivableInput = {
   received_amount?: number
   status?: Receivable['status']
   received_at?: string
+  notes?: string
 }
 
 export async function getReceivables(): Promise<Receivable[]> {
@@ -152,6 +156,7 @@ export async function createReceivable(input: CreateReceivableInput): Promise<Re
       supplier_id: input.supplier_id || null,
       due_date: input.due_date,
       expected_amount: input.expected_amount,
+      installment_value: input.installment_value,
       status: 'pending',
     })
     .select()
@@ -173,6 +178,7 @@ export async function updateReceivable(
   if (input.received_amount !== undefined) updateData.received_amount = input.received_amount
   if (input.status !== undefined) updateData.status = input.status
   if (input.received_at !== undefined) updateData.received_at = input.received_at
+  if (input.notes !== undefined) updateData.notes = input.notes
 
   const { data, error } = await supabase
     .from('receivables')
@@ -208,6 +214,53 @@ export async function deleteReceivable(id: string): Promise<void> {
   if (error) throw error
 }
 
+export async function deleteReceivablesBySaleId(saleId: string): Promise<void> {
+  const supabase = createClient()
+  if (!supabase) throw new Error('Supabase not configured')
+
+  const { error } = await supabase
+    .from('receivables')
+    .delete()
+    .eq('personal_sale_id', saleId)
+
+  if (error) throw error
+}
+
+export async function createReceivablesBatch(
+  inputs: CreateReceivableInput[],
+  userId: string
+): Promise<Receivable[]> {
+  const supabase = createClient()
+  if (!supabase) throw new Error('Supabase not configured')
+
+  if (inputs.length === 0) return []
+
+  const records = inputs.map(input => ({
+    user_id: userId,
+    personal_sale_id: input.personal_sale_id || null,
+    supplier_id: input.supplier_id || null,
+    due_date: input.due_date,
+    expected_amount: input.expected_amount,
+    installment_value: input.installment_value,
+    status: 'pending',
+  }))
+
+  const { data, error } = await supabase
+    .from('receivables')
+    .insert(records)
+    .select()
+
+  if (error) throw error
+  return data || []
+}
+
+type ReceivableStatsRow = {
+  due_date: string
+  expected_amount: number | null
+  received_amount: number | null
+  status: string
+}
+
 export async function getReceivablesStats() {
   const supabase = createClient()
   if (!supabase) throw new Error('Supabase not configured')
@@ -222,15 +275,16 @@ export async function getReceivablesStats() {
 
   if (error) throw error
 
-  const pending = data?.filter(r => r.status === 'pending') || []
+  const rows: ReceivableStatsRow[] = data || []
+  const pending = rows.filter(r => r.status === 'pending')
   const overdue = pending.filter(r => r.due_date < today)
   const dueInSevenDays = pending.filter(
     r => r.due_date >= today && r.due_date <= sevenDaysLater.toISOString().split('T')[0]
   )
 
-  const totalPending = pending.reduce((sum, r) => sum + (r.expected_amount || 0), 0)
-  const totalOverdue = overdue.reduce((sum, r) => sum + (r.expected_amount || 0), 0)
-  const totalDueInSevenDays = dueInSevenDays.reduce((sum, r) => sum + (r.expected_amount || 0), 0)
+  const totalPending = pending.reduce((sum: number, r) => sum + (r.expected_amount || 0), 0)
+  const totalOverdue = overdue.reduce((sum: number, r) => sum + (r.expected_amount || 0), 0)
+  const totalDueInSevenDays = dueInSevenDays.reduce((sum: number, r) => sum + (r.expected_amount || 0), 0)
 
   return {
     totalPending,

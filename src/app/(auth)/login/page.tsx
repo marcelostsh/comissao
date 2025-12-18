@@ -1,29 +1,28 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { Loader2, Mail, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
-  const { signInWithGoogle, signUpWithPassword, signInWithPassword, isConfigured } = useAuth()
+  const { signInWithGoogle, signUpWithPassword, signInWithPassword, resetPassword, isConfigured } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
+  const [resetEmailSent, setResetEmailSent] = useState(false)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,16 +42,34 @@ export default function LoginPage() {
       }
     } else {
       const { error } = await signInWithPassword(email, password)
-      setLoading(false)
 
       if (error) {
+        setLoading(false)
         toast.error(error)
+      } else {
+        router.refresh()
       }
     }
   }
 
   const handleGoogleLogin = async () => {
     await signInWithGoogle()
+  }
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!forgotPasswordEmail) return
+
+    setLoading(true)
+    const { error } = await resetPassword(forgotPasswordEmail)
+    setLoading(false)
+
+    if (error) {
+      toast.error(error)
+    } else {
+      setResetEmailSent(true)
+      toast.success('Email de recuperação enviado!')
+    }
   }
 
   if (!isConfigured) {
@@ -100,6 +117,84 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key`}
     )
   }
 
+  if (resetEmailSent) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Mail className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Verifique seu email</CardTitle>
+            <CardDescription>
+              Enviamos um link de recuperação para <strong>{forgotPasswordEmail}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-center text-sm text-muted-foreground">
+              Clique no link no email para redefinir sua senha.
+            </p>
+            <p className="text-center text-sm text-muted-foreground">
+              Não recebeu? Verifique a pasta de spam.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setResetEmailSent(false)
+                setShowForgotPassword(false)
+                setForgotPasswordEmail('')
+              }}
+            >
+              Voltar ao login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (showForgotPassword) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Esqueci minha senha</CardTitle>
+            <CardDescription>
+              Digite seu email para receber um link de recuperação
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <Button className="w-full" type="submit" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enviar link de recuperação
+              </Button>
+            </form>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => setShowForgotPassword(false)}
+            >
+              Voltar ao login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -135,7 +230,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key`}
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">ou</span>
+              <span className="bg-card px-2 text-muted-foreground">ou</span>
             </div>
           </div>
 
@@ -158,7 +253,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key`}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password-login">Senha</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password-login">Senha</Label>
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                      onClick={() => setShowForgotPassword(true)}
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
                   <div className="relative">
                     <Input
                       id="password-login"

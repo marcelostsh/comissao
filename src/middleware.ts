@@ -8,7 +8,7 @@ const PERSONAL_ROUTES = ['/home', '/minhasvendas', '/fornecedores', '/recebiveis
 const ORG_ROUTES = ['/', '/vendas', '/vendedores', '/regras', '/relatorios', '/configuracoes']
 
 // Rotas que não exigem modo definido
-const PUBLIC_AUTH_ROUTES = ['/login', '/onboarding', '/auth/callback']
+const PUBLIC_AUTH_ROUTES = ['/login', '/onboarding', '/auth/callback', '/reset-password']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
