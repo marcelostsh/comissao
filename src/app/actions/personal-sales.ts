@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { commissionEngine } from '@/lib/commission-engine'
-import { generateReceivablesFromSale, regenerateReceivablesFromSale } from '@/services/receivable-service'
 import type { PersonalSale, PersonalSaleWithItems, CreatePersonalSaleInput } from '@/types'
 
 // Schemas
@@ -221,21 +220,8 @@ export async function createPersonalSale(
       throw itemsError
     }
 
-    // Gerar recebíveis
-    try {
-      await generateReceivablesFromSale({
-        saleId: sale.id,
-        supplierId: supplier_id,
-        userId: user.id,
-        saleDate: sale_date,
-        grossValue: grossValue,
-        commissionValue: commissionValue,
-        paymentCondition: payment_condition || null,
-      })
-    } catch (receivableError) {
-      console.error('Error generating receivables:', receivableError)
-      // Não falha a venda se receivables falhar, mas loga
-    }
+    // Recebíveis são calculados on-the-fly via view v_receivables
+    // Não precisa mais gerar registros aqui
 
     revalidatePath('/minhasvendas')
     revalidatePath('/recebiveis')
@@ -374,21 +360,8 @@ export async function updatePersonalSale(
 
     if (itemsError) throw itemsError
 
-    // Regenerar recebíveis (deleta antigos e cria novos)
-    try {
-      await regenerateReceivablesFromSale({
-        saleId: sale.id,
-        supplierId: supplier_id,
-        userId: user.id,
-        saleDate: sale_date,
-        grossValue: grossValue,
-        commissionValue: commissionValue,
-        paymentCondition: payment_condition || null,
-      })
-    } catch (receivableError) {
-      console.error('Error regenerating receivables:', receivableError)
-      // Não falha a atualização se receivables falhar, mas loga
-    }
+    // Recebíveis são calculados on-the-fly via view v_receivables
+    // Ao editar a venda, as parcelas atualizam automaticamente
 
     revalidatePath('/minhasvendas')
     revalidatePath(`/minhasvendas/${id}`)

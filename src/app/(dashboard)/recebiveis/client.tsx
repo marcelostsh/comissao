@@ -32,20 +32,13 @@ function getMonthYear(dateStr: string): string {
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date)
 }
 
-function isOverdue(dateStr: string): boolean {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const date = new Date(dateStr + 'T12:00:00')
-  return date < today
-}
-
 export function ReceivablesClient({ receivables, stats }: Props) {
   const [loading, setLoading] = useState<string | null>(null)
   const [showReceived, setShowReceived] = useState(false)
 
-  // Separar por status
+  // Separar por status (view já calcula o status)
   const pendingReceivables = useMemo(() => {
-    return receivables.filter(r => r.status === 'pending')
+    return receivables.filter(r => r.status === 'pending' || r.status === 'overdue')
   }, [receivables])
 
   const receivedReceivables = useMemo(() => {
@@ -67,10 +60,15 @@ export function ReceivablesClient({ receivables, stats }: Props) {
     return groups
   }, [pendingReceivables])
 
-  const handleMarkReceived = async (id: string) => {
-    setLoading(id)
+  const handleMarkReceived = async (receivable: ReceivableRow) => {
+    const key = `${receivable.personal_sale_id}-${receivable.installment_number}`
+    setLoading(key)
     try {
-      const result = await markReceivableAsReceived(id)
+      const result = await markReceivableAsReceived(
+        receivable.personal_sale_id,
+        receivable.installment_number,
+        receivable.expected_commission
+      )
       if (result.success) {
         toast.success('Marcado como recebido')
       } else {
@@ -83,10 +81,14 @@ export function ReceivablesClient({ receivables, stats }: Props) {
     }
   }
 
-  const handleUndoReceived = async (id: string) => {
-    setLoading(id)
+  const handleUndoReceived = async (receivable: ReceivableRow) => {
+    const key = `${receivable.personal_sale_id}-${receivable.installment_number}`
+    setLoading(key)
     try {
-      const result = await undoReceivableReceived(id)
+      const result = await undoReceivableReceived(
+        receivable.personal_sale_id,
+        receivable.installment_number
+      )
       if (result.success) {
         toast.success('Recebimento desfeito')
       } else {
@@ -176,42 +178,48 @@ export function ReceivablesClient({ receivables, stats }: Props) {
                 <CardContent className="p-0">
                   <div className="divide-y">
                     {items.map((receivable) => {
-                      const overdue = isOverdue(receivable.due_date)
-                      const isLoading = loading === receivable.id
+                      const isOverdue = receivable.status === 'overdue'
+                      const key = `${receivable.personal_sale_id}-${receivable.installment_number}`
+                      const isLoading = loading === key
 
                       return (
                         <div
-                          key={receivable.id}
+                          key={key}
                           className={cn(
                             'flex items-center gap-4 p-4',
-                            overdue && 'bg-destructive/5'
+                            isOverdue && 'bg-destructive/5'
                           )}
                         >
                           {/* Checkbox */}
                           <Checkbox
                             checked={false}
                             disabled={isLoading}
-                            onCheckedChange={() => handleMarkReceived(receivable.id)}
+                            onCheckedChange={() => handleMarkReceived(receivable)}
                             className="h-5 w-5"
                           />
 
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className={cn('font-medium', overdue && 'text-destructive')}>
+                              <span className={cn('font-medium', isOverdue && 'text-destructive')}>
                                 {formatDate(receivable.due_date)}
                               </span>
-                              {overdue && (
+                              {receivable.total_installments > 1 && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({receivable.installment_number}/{receivable.total_installments})
+                                </span>
+                              )}
+                              {isOverdue && (
                                 <Badge variant="destructive" className="text-xs">
                                   Atrasado
                                 </Badge>
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground truncate">
-                              {receivable.sale?.client_name || 'Cliente não informado'}
-                              {receivable.supplier && (
+                              {receivable.client_name || 'Cliente não informado'}
+                              {receivable.supplier_name && (
                                 <span className="text-muted-foreground/70">
-                                  {' · '}{receivable.supplier.name}
+                                  {' · '}{receivable.supplier_name}
                                 </span>
                               )}
                             </div>
@@ -220,7 +228,7 @@ export function ReceivablesClient({ receivables, stats }: Props) {
                           {/* Valores */}
                           <div className="text-right">
                             <div className="font-mono font-semibold text-green-600">
-                              {formatCurrency(receivable.expected_amount || 0)}
+                              {formatCurrency(receivable.expected_commission || 0)}
                             </div>
                             {receivable.installment_value && (
                               <div className="text-xs text-muted-foreground font-mono">
@@ -256,18 +264,19 @@ export function ReceivablesClient({ receivables, stats }: Props) {
               <CardContent className="p-0">
                 <div className="divide-y">
                   {receivedReceivables.map((receivable) => {
-                    const isLoading = loading === receivable.id
+                    const key = `${receivable.personal_sale_id}-${receivable.installment_number}`
+                    const isLoading = loading === key
 
                     return (
                       <div
-                        key={receivable.id}
+                        key={key}
                         className="flex items-center gap-4 p-4 opacity-60"
                       >
                         {/* Checkbox marcado */}
                         <Checkbox
                           checked={true}
                           disabled={isLoading}
-                          onCheckedChange={() => handleUndoReceived(receivable.id)}
+                          onCheckedChange={() => handleUndoReceived(receivable)}
                           className="h-5 w-5"
                         />
 
@@ -277,19 +286,24 @@ export function ReceivablesClient({ receivables, stats }: Props) {
                             <span className="font-medium line-through">
                               {formatDate(receivable.due_date)}
                             </span>
+                            {receivable.total_installments > 1 && (
+                              <span className="text-xs text-muted-foreground">
+                                ({receivable.installment_number}/{receivable.total_installments})
+                              </span>
+                            )}
                             <Badge variant="outline" className="text-xs text-green-600 border-green-600/30">
                               Recebido
                             </Badge>
                           </div>
                           <div className="text-sm text-muted-foreground truncate">
-                            {receivable.sale?.client_name || 'Cliente não informado'}
+                            {receivable.client_name || 'Cliente não informado'}
                           </div>
                         </div>
 
                         {/* Valores */}
                         <div className="text-right">
                           <div className="font-mono font-semibold">
-                            {formatCurrency(receivable.received_amount || receivable.expected_amount || 0)}
+                            {formatCurrency(receivable.received_amount || receivable.expected_commission || 0)}
                           </div>
                         </div>
                       </div>
@@ -304,4 +318,3 @@ export function ReceivablesClient({ receivables, stats }: Props) {
     </div>
   )
 }
-

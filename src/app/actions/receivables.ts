@@ -3,27 +3,31 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 
+// =====================================================
+// TYPES
+// =====================================================
+
 export type ReceivableRow = {
-  id: string
+  id: string // composição: sale_id-installment_number
   user_id: string
-  personal_sale_id: string | null
+  personal_sale_id: string
   supplier_id: string | null
+  installment_number: number
+  total_installments: number
+  sale_date: string
   due_date: string
-  expected_amount: number | null
-  installment_value: number | null
-  received_amount: number | null
-  status: 'pending' | 'received' | 'overdue' | 'partial'
+  installment_value: number
+  expected_commission: number
+  client_name: string | null
+  sale_gross_value: number
+  sale_commission_value: number
+  commission_rate: number | null
+  received_payment_id: string | null
   received_at: string | null
+  received_amount: number | null
   notes: string | null
-  created_at: string
-  sale: {
-    id: string
-    client_name: string | null
-  } | null
-  supplier: {
-    id: string
-    name: string
-  } | null
+  status: 'pending' | 'received' | 'overdue'
+  supplier_name: string | null
 }
 
 export type ReceivablesStats = {
@@ -35,6 +39,14 @@ export type ReceivablesStats = {
   countReceived: number
 }
 
+type ActionResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string }
+
+// =====================================================
+// QUERIES
+// =====================================================
+
 export async function getReceivables(): Promise<ReceivableRow[]> {
   const supabase = await createClient()
 
@@ -42,12 +54,8 @@ export async function getReceivables(): Promise<ReceivableRow[]> {
   if (!user) throw new Error('User not authenticated')
 
   const { data, error } = await supabase
-    .from('receivables')
-    .select(`
-      *,
-      sale:personal_sales(id, client_name),
-      supplier:personal_suppliers(id, name)
-    `)
+    .from('v_receivables')
+    .select('*')
     .eq('user_id', user.id)
     .order('due_date', { ascending: true })
 
@@ -61,11 +69,9 @@ export async function getReceivablesStats(): Promise<ReceivablesStats> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('User not authenticated')
 
-  const today = new Date().toISOString().split('T')[0]
-
   const { data, error } = await supabase
-    .from('receivables')
-    .select('due_date, expected_amount, status')
+    .from('v_receivables')
+    .select('status, expected_commission')
     .eq('user_id', user.id)
 
   if (error) throw error
@@ -73,27 +79,31 @@ export async function getReceivablesStats(): Promise<ReceivablesStats> {
   const rows = data || []
   
   const pending = rows.filter(r => r.status === 'pending')
-  const overdue = pending.filter(r => r.due_date < today)
-  const pendingNotOverdue = pending.filter(r => r.due_date >= today)
+  const overdue = rows.filter(r => r.status === 'overdue')
   const received = rows.filter(r => r.status === 'received')
 
   return {
-    totalPending: pendingNotOverdue.reduce((sum, r) => sum + (r.expected_amount || 0), 0),
-    totalOverdue: overdue.reduce((sum, r) => sum + (r.expected_amount || 0), 0),
-    totalReceived: received.reduce((sum, r) => sum + (r.expected_amount || 0), 0),
-    countPending: pendingNotOverdue.length,
+    totalPending: pending.reduce((sum, r) => sum + (r.expected_commission || 0), 0),
+    totalOverdue: overdue.reduce((sum, r) => sum + (r.expected_commission || 0), 0),
+    totalReceived: received.reduce((sum, r) => sum + (r.expected_commission || 0), 0),
+    countPending: pending.length,
     countOverdue: overdue.length,
     countReceived: received.length,
   }
 }
 
-type ActionResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string }
+// =====================================================
+// MUTATIONS
+// =====================================================
 
+/**
+ * Marca uma parcela como recebida.
+ * Insere registro na tabela received_payments.
+ */
 export async function markReceivableAsReceived(
-  id: string,
-  receivedAmount?: number
+  personalSaleId: string,
+  installmentNumber: number,
+  receivedAmount: number
 ): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient()
@@ -103,31 +113,35 @@ export async function markReceivableAsReceived(
       return { success: false, error: 'Usuário não autenticado' }
     }
 
-    // Buscar o recebível para pegar o expected_amount se não foi informado
-    const { data: receivable, error: fetchError } = await supabase
-      .from('receivables')
-      .select('expected_amount')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (fetchError || !receivable) {
-      return { success: false, error: 'Recebível não encontrado' }
-    }
-
-    const amount = receivedAmount ?? receivable.expected_amount ?? 0
-
+    // Inserir marcação de recebimento
     const { error } = await supabase
-      .from('receivables')
-      .update({
-        status: 'received',
-        received_amount: amount,
+      .from('received_payments')
+      .insert({
+        user_id: user.id,
+        personal_sale_id: personalSaleId,
+        installment_number: installmentNumber,
+        received_amount: receivedAmount,
         received_at: new Date().toISOString(),
       })
-      .eq('id', id)
-      .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      // Se já existe (UNIQUE constraint), tenta update
+      if (error.code === '23505') {
+        const { error: updateError } = await supabase
+          .from('received_payments')
+          .update({
+            received_amount: receivedAmount,
+            received_at: new Date().toISOString(),
+          })
+          .eq('personal_sale_id', personalSaleId)
+          .eq('installment_number', installmentNumber)
+          .eq('user_id', user.id)
+
+        if (updateError) throw updateError
+      } else {
+        throw error
+      }
+    }
 
     revalidatePath('/recebiveis')
     return { success: true, data: undefined }
@@ -137,9 +151,13 @@ export async function markReceivableAsReceived(
   }
 }
 
-export async function updateReceivableNotes(
-  id: string,
-  notes: string
+/**
+ * Desfaz a marcação de recebimento.
+ * Remove registro da tabela received_payments.
+ */
+export async function undoReceivableReceived(
+  personalSaleId: string,
+  installmentNumber: number
 ): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient()
@@ -150,38 +168,10 @@ export async function updateReceivableNotes(
     }
 
     const { error } = await supabase
-      .from('receivables')
-      .update({ notes })
-      .eq('id', id)
-      .eq('user_id', user.id)
-
-    if (error) throw error
-
-    revalidatePath('/recebiveis')
-    return { success: true, data: undefined }
-  } catch (err) {
-    console.error('Error updating receivable notes:', err)
-    return { success: false, error: 'Erro ao atualizar observação' }
-  }
-}
-
-export async function undoReceivableReceived(id: string): Promise<ActionResult<void>> {
-  try {
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return { success: false, error: 'Usuário não autenticado' }
-    }
-
-    const { error } = await supabase
-      .from('receivables')
-      .update({
-        status: 'pending',
-        received_amount: null,
-        received_at: null,
-      })
-      .eq('id', id)
+      .from('received_payments')
+      .delete()
+      .eq('personal_sale_id', personalSaleId)
+      .eq('installment_number', installmentNumber)
       .eq('user_id', user.id)
 
     if (error) throw error
@@ -194,3 +184,68 @@ export async function undoReceivableReceived(id: string): Promise<ActionResult<v
   }
 }
 
+/**
+ * Atualiza observação de um recebimento.
+ */
+export async function updateReceivableNotes(
+  personalSaleId: string,
+  installmentNumber: number,
+  notes: string
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: 'Usuário não autenticado' }
+    }
+
+    // Precisa existir um received_payment para adicionar nota
+    // Se não existe, cria um com received_amount = 0 (parcela pendente com nota)
+    const { data: existing } = await supabase
+      .from('received_payments')
+      .select('id')
+      .eq('personal_sale_id', personalSaleId)
+      .eq('installment_number', installmentNumber)
+      .eq('user_id', user.id)
+      .single()
+
+    if (existing) {
+      const { error } = await supabase
+        .from('received_payments')
+        .update({ notes })
+        .eq('personal_sale_id', personalSaleId)
+        .eq('installment_number', installmentNumber)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+    } else {
+      // Buscar valor esperado da view para criar o registro
+      const { data: receivable } = await supabase
+        .from('v_receivables')
+        .select('expected_commission')
+        .eq('personal_sale_id', personalSaleId)
+        .eq('installment_number', installmentNumber)
+        .eq('user_id', user.id)
+        .single()
+
+      const { error } = await supabase
+        .from('received_payments')
+        .insert({
+          user_id: user.id,
+          personal_sale_id: personalSaleId,
+          installment_number: installmentNumber,
+          received_amount: receivable?.expected_commission || 0,
+          notes,
+        })
+
+      if (error) throw error
+    }
+
+    revalidatePath('/recebiveis')
+    return { success: true, data: undefined }
+  } catch (err) {
+    console.error('Error updating receivable notes:', err)
+    return { success: false, error: 'Erro ao atualizar observação' }
+  }
+}
