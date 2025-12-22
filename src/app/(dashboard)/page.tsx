@@ -1,7 +1,10 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
 import { useOrganization } from '@/contexts/organization-context'
+import { useAuth } from '@/contexts/auth-context'
+import { createClient } from '@/lib/supabase'
 import { getDashboardSummary, getDashboardHistory } from '@/app/actions/commissions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -63,12 +66,31 @@ function formatPeriodLabel(period: string): string {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const { user } = useAuth()
   const { organization, loading: orgLoading } = useOrganization()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [history, setHistory] = useState<DashboardHistory | null>(null)
   const [loading, setLoading] = useState(true)
   const [historyLoading, setHistoryLoading] = useState(true)
   const [period, setPeriod] = useState(getCurrentPeriod())
+
+  useEffect(() => {
+    async function checkMode() {
+      if (!user) return
+      const supabase = createClient()
+      const { data: pref } = await supabase
+        .from('user_preferences')
+        .select('user_mode')
+        .eq('user_id', user.id)
+        .single()
+
+      if (pref?.user_mode === 'personal') {
+        router.push('/home')
+      }
+    }
+    checkMode()
+  }, [user, router])
 
   const periods = generatePeriods()
 

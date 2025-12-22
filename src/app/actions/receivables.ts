@@ -147,6 +147,7 @@ export async function markReceivableAsReceived(
     }
 
     revalidatePath('/recebiveis')
+    revalidatePath('/home')
     return { success: true, data: undefined }
   } catch (err) {
     console.error('Error marking receivable as received:', err)
@@ -180,6 +181,7 @@ export async function undoReceivableReceived(
     if (error) throw error
 
     revalidatePath('/recebiveis')
+    revalidatePath('/home')
     return { success: true, data: undefined }
   } catch (err) {
     console.error('Error undoing receivable received:', err)
@@ -246,6 +248,7 @@ export async function updateReceivableNotes(
     }
 
     revalidatePath('/recebiveis')
+    revalidatePath('/home')
     return { success: true, data: undefined }
   } catch (err) {
     console.error('Error updating receivable notes:', err)

@@ -35,6 +35,7 @@ import { toast } from 'sonner'
 type Props = {
   receivables: ReceivableRow[]
   stats: ReceivablesStats
+  isHome?: boolean
 }
 
 function formatCurrency(value: number): string {
@@ -81,11 +82,12 @@ function InstallmentDots({ current, total, status }: { current: number, total: n
   )
 }
 
-export function ReceivablesClient({ receivables, stats }: Props) {
+export function ReceivablesClient({ receivables, stats, isHome }: Props) {
   const [loading, setLoading] = useState(false)
   const [showReceived, setShowReceived] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'overdue' | 'received'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [expandedMonths, setExpandedMonths] = useState<string[]>([])
   
   // Modo Conciliação
   const [isEditMode, setIsEditMode] = useState(false)
@@ -94,6 +96,12 @@ export function ReceivablesClient({ receivables, stats }: Props) {
   const [receivedAtDate, setReceivedAtDate] = useState(new Date().toISOString().split('T')[0])
 
   const today = new Date().toISOString().split('T')[0]
+
+  const toggleMonth = (month: string) => {
+    setExpandedMonths(prev => 
+      prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]
+    )
+  }
 
   const filteredReceivables = useMemo(() => {
     return receivables.filter(r => {
@@ -191,8 +199,12 @@ export function ReceivablesClient({ receivables, stats }: Props) {
         {/* Header com Botão de Ação Principal */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-bold tracking-tight text-primary">Recebíveis</h1>
-            <p className="text-muted-foreground text-lg">Gerencie seu fluxo de comissões com precisão.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-primary">
+              {isHome ? 'Seu Painel Financeiro' : 'Recebíveis'}
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              {isHome ? 'Resumo de fluxo de caixa e comissões.' : 'Gerencie seu fluxo de comissões com precisão.'}
+            </p>
           </div>
           
           {!isEditMode ? (
@@ -308,87 +320,110 @@ export function ReceivablesClient({ receivables, stats }: Props) {
 
         {/* Lista de Pendentes */}
         {!isEmpty && Object.keys(groupedByMonth).length > 0 && (
-          <div className="space-y-8">
-            {Object.entries(groupedByMonth).map(([month, items]) => (
-              <div key={month} className="space-y-3">
-                <div className="flex items-center gap-4 px-1">
-                  <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">{month}</h3>
-                  <div className="h-px flex-1 bg-border/60" />
-                </div>
-                
-                <div className="grid gap-3">
-                  {items.map((receivable) => {
-                    const isOverdue = receivable.status === 'overdue'
-                    const isToday = receivable.due_date === today
-                    const key = `${receivable.personal_sale_id}-${receivable.installment_number}`
-                    const isSelected = selectedIds.includes(key)
+          <div className="space-y-4">
+            {Object.entries(groupedByMonth).map(([month, items]) => {
+              const isExpanded = expandedMonths.includes(month) || filterStatus !== 'all' || searchTerm
+              const monthTotal = items.reduce((acc, curr) => acc + (curr.expected_commission || 0), 0)
+              
+              return (
+                <div key={month} className="space-y-2 border rounded-xl overflow-hidden bg-background shadow-sm">
+                  <button 
+                    onClick={() => toggleMonth(month)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col items-start">
+                        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">{month}</h3>
+                        <div className="text-xs text-muted-foreground">{items.length} parcelas</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <div className="text-xs font-bold uppercase text-muted-foreground/60 leading-tight">Total Mês</div>
+                        <div className="text-lg font-bold text-primary">{formatCurrency(monthTotal)}</div>
+                      </div>
+                      {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+                    </div>
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="p-3 bg-muted/20 border-t max-h-[450px] overflow-y-auto custom-scrollbar">
+                      <div className="grid gap-3">
+                        {items.map((receivable) => {
+                          const isOverdue = receivable.status === 'overdue'
+                          const isToday = receivable.due_date === today
+                          const key = `${receivable.personal_sale_id}-${receivable.installment_number}`
+                          const isSelected = selectedIds.includes(key)
 
-                    return (
-                      <Card 
-                        key={key} 
-                        onClick={() => isEditMode && toggleSelection(key)}
-                        className={cn(
-                          "group transition-all duration-200 border-l-4 overflow-hidden",
-                          isEditMode ? "cursor-pointer hover:border-l-primary/50" : "hover:shadow-md",
-                          isSelected ? "border-l-primary bg-primary/5 shadow-inner" : 
-                          isOverdue ? "border-l-destructive bg-destructive/5" : 
-                          isToday ? "border-l-orange-500 bg-orange-500/5 shadow-sm" : 
-                          "border-l-transparent"
-                        )}
-                      >
-                        <CardContent className="p-0">
-                          <div className="flex items-center gap-4 p-4">
-                            {isEditMode && (
-                              <div 
-                                className="flex flex-col items-center justify-center pr-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Checkbox
-                                  checked={isSelected}
-                                  onCheckedChange={() => toggleSelection(key)}
-                                  className="h-6 w-6 border-2"
-                                />
-                              </div>
-                            )}
+                          return (
+                            <Card 
+                              key={key} 
+                              onClick={() => isEditMode && toggleSelection(key)}
+                              className={cn(
+                                "group transition-all duration-200 border-l-4 overflow-hidden",
+                                isEditMode ? "cursor-pointer hover:border-l-primary/50" : "hover:shadow-md",
+                                isSelected ? "border-l-primary bg-primary/5 shadow-inner" : 
+                                isOverdue ? "border-l-destructive bg-destructive/5" : 
+                                isToday ? "border-l-orange-500 bg-orange-500/5 shadow-sm" : 
+                                "border-l-transparent"
+                              )}
+                            >
+                              <CardContent className="p-0">
+                                <div className="flex items-center gap-4 p-4">
+                                  {isEditMode && (
+                                    <div 
+                                      className="flex flex-col items-center justify-center pr-2"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() => toggleSelection(key)}
+                                        className="h-6 w-6 border-2"
+                                      />
+                                    </div>
+                                  )}
 
-                            <div className="flex flex-col items-center justify-center min-w-[60px] border-r pr-4 border-border/50">
-                              <span className={cn("text-lg font-bold leading-none", isOverdue ? "text-destructive" : isToday ? "text-orange-600" : "text-foreground")}>
-                                {formatDate(receivable.due_date).split('/')[0]}
-                              </span>
-                              <span className="text-[10px] font-bold uppercase text-muted-foreground">
-                                {new Date(receivable.due_date + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
-                              </span>
-                            </div>
+                                  <div className="flex flex-col items-center justify-center min-w-[60px] border-r pr-4 border-border/50">
+                                    <span className={cn("text-lg font-bold leading-none", isOverdue ? "text-destructive" : isToday ? "text-orange-600" : "text-foreground")}>
+                                      {formatDate(receivable.due_date).split('/')[0]}
+                                    </span>
+                                    <span className="text-[10px] font-bold uppercase text-muted-foreground">
+                                      {new Date(receivable.due_date + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
+                                    </span>
+                                  </div>
 
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <h4 className="font-semibold text-base truncate">{receivable.client_name || 'Cliente Final'}</h4>
-                                {isOverdue && <Badge variant="destructive" className="h-4 text-[10px] font-bold px-1.5 uppercase">Atrasado</Badge>}
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <div className="text-sm text-muted-foreground flex items-center gap-1.5">
-                                  <span className="font-medium text-foreground/80">{receivable.supplier_name || 'Direto'}</span>
-                                  <span className="text-muted-foreground/30">•</span>
-                                  <span className="text-xs">Parcela {receivable.installment_number} de {receivable.total_installments}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <h4 className="font-semibold text-base truncate">{receivable.client_name || 'Cliente Final'}</h4>
+                                      {isOverdue && <Badge variant="destructive" className="h-4 text-[10px] font-bold px-1.5 uppercase">Atrasado</Badge>}
+                                    </div>
+                                    <div className="flex flex-col gap-0.5">
+                                      <div className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                        <span className="font-medium text-foreground/80">{receivable.supplier_name || 'Direto'}</span>
+                                        <span className="text-muted-foreground/30">•</span>
+                                        <span className="text-xs">Parcela {receivable.installment_number} de {receivable.total_installments}</span>
+                                      </div>
+                                      <InstallmentDots current={receivable.installment_number} total={receivable.total_installments} status={receivable.status} />
+                                    </div>
+                                  </div>
+
+                                  <div className="text-right">
+                                    <div className="text-xs font-bold uppercase text-muted-foreground/60 leading-tight">Comissão</div>
+                                    <div className={cn("text-xl font-black font-mono tracking-tight", isOverdue ? "text-destructive" : "text-green-600")}>
+                                      {formatCurrency(receivable.expected_commission || 0)}
+                                    </div>
+                                  </div>
                                 </div>
-                                <InstallmentDots current={receivable.installment_number} total={receivable.total_installments} status={receivable.status} />
-                              </div>
-                            </div>
-
-                            <div className="text-right">
-                              <div className="text-xs font-bold uppercase text-muted-foreground/60 leading-tight">Comissão</div>
-                              <div className={cn("text-xl font-black font-mono tracking-tight", isOverdue ? "text-destructive" : "text-green-600")}>
-                                {formatCurrency(receivable.expected_commission || 0)}
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 

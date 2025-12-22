@@ -107,7 +107,7 @@ export async function middleware(request: NextRequest) {
       const isPersonalRoute = PERSONAL_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
       const isOrgRoute = ORG_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
 
-      if (pref?.user_mode === 'personal' && isOrgRoute && pathname !== '/') {
+      if (pref?.user_mode === 'personal' && isOrgRoute) {
         // Vendedor tentando acessar rota de empresa
         const url = request.nextUrl.clone()
         url.pathname = '/home'
