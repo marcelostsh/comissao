@@ -1,7 +1,6 @@
 'use client'
 
 import { useAuth } from '@/contexts/auth-context'
-import { useOrganization } from '@/contexts/organization-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,12 +13,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { ThemeToggle } from './theme-toggle'
-import { LogOut, Settings } from 'lucide-react'
+import { LogOut, User } from 'lucide-react'
 import Link from 'next/link'
 
 export function Header() {
   const { user, signOut } = useAuth()
-  const { organization } = useOrganization()
 
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? 'U'
 
@@ -27,9 +25,7 @@ export function Header() {
     <header className="flex h-14 items-center gap-4 border-b bg-background px-4">
       <SidebarTrigger />
 
-      <div className="flex-1">
-        {organization && <span className="text-sm text-muted-foreground">{organization.name}</span>}
-      </div>
+      <div className="flex-1" />
 
       <ThemeToggle />
 
@@ -53,9 +49,9 @@ export function Header() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/configuracoes">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Configurações</span>
+            <Link href="/minhaconta">
+              <User className="mr-2 h-4 w-4" />
+              <span>Minha Conta</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

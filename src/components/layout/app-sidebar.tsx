@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { Home, Users, Scale, ShoppingCart, BarChart3, Building2, Settings, User } from 'lucide-react'
+import { Home, Users, Scale, ShoppingCart, BarChart3, Building2, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
@@ -36,7 +36,6 @@ const personalMenuItems = [
   { title: 'Início', url: '/home', icon: Home },
   { title: 'Minhas Pastas', url: '/fornecedores', icon: Building2 },
   { title: 'Minhas Vendas', url: '/minhasvendas', icon: ShoppingCart },
-  { title: 'Minha Conta', url: '/minhaconta', icon: User },
 ]
 
 export function AppSidebar() {
