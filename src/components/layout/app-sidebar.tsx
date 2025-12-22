@@ -18,6 +18,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { createClient } from '@/lib/supabase'
+import { useTheme } from 'next-themes'
+import Image from 'next/image'
 
 type UserMode = 'personal' | 'organization' | null
 
@@ -41,21 +43,19 @@ const personalMenuItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const { user } = useAuth()
+  const { resolvedTheme } = useTheme()
   const [userMode, setUserMode] = useState<UserMode>(null)
-  const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    // eslint-disable-next-line
+    setMounted(true)
+    
     async function fetchUserMode() {
-      if (!user) {
-        setLoading(false)
-        return
-      }
+      if (!user) return
 
       const supabase = createClient()
-      if (!supabase) {
-        setLoading(false)
-        return
-      }
+      if (!supabase) return
 
       const { data } = await supabase
         .from('user_preferences')
@@ -64,28 +64,37 @@ export function AppSidebar() {
         .single()
 
       setUserMode(data?.user_mode || null)
-      setLoading(false)
     }
 
     fetchUserMode()
   }, [user])
 
   const menuItems = userMode === 'personal' ? personalMenuItems : orgMenuItems
-  const modeLabel = userMode === 'personal' ? 'Vendedor' : 'Empresa'
+
+  const isDark = mounted && resolvedTheme === 'dark'
+  const iconSrc = isDark ? '/images/logo/logo_icon_dark.svg' : '/images/logo/logo_icon_light.svg'
+  const textSrc = isDark ? '/images/logo/logo_texto_dark.svg' : '/images/logo/logo_texto_light.svg'
 
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <span className="text-sm font-bold">C</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold">Audtrax</span>
-            {!loading && userMode && (
-              <span className="text-xs text-muted-foreground">{modeLabel}</span>
-            )}
-          </div>
+        <div className="flex items-center gap-2 px-4 py-3">
+          <Image
+            src={iconSrc}
+            alt=""
+            width={32}
+            height={32}
+            priority
+            className="h-8 w-auto"
+          />
+          <Image
+            src={textSrc}
+            alt="Audtrax"
+            width={120}
+            height={24}
+            priority
+            className="h-5 w-auto"
+          />
         </div>
       </SidebarHeader>
       <SidebarContent>
