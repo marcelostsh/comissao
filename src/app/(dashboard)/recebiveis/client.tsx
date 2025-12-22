@@ -45,12 +45,21 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T12:00:00')
+  // Se já tiver 'T', é um timestamp completo, não precisa concatenar
+  const finalStr = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`
+  const date = new Date(finalStr)
+  
+  if (isNaN(date.getTime())) return 'Data Inválida'
+  
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(date)
 }
 
 function getMonthYear(dateStr: string): string {
-  const date = new Date(dateStr + 'T12:00:00')
+  const finalStr = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`
+  const date = new Date(finalStr)
+  
+  if (isNaN(date.getTime())) return 'Mês Inválido'
+  
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date)
 }
 
@@ -330,7 +339,10 @@ export function ReceivablesClient({ receivables, stats }: Props) {
                         <CardContent className="p-0">
                           <div className="flex items-center gap-4 p-4">
                             {isEditMode && (
-                              <div className="flex flex-col items-center justify-center pr-2">
+                              <div 
+                                className="flex flex-col items-center justify-center pr-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <Checkbox
                                   checked={isSelected}
                                   onCheckedChange={() => toggleSelection(key)}
