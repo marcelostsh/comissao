@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -12,41 +12,56 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { createPersonalClient } from '@/app/actions/personal-clients'
+import { createPersonalClient, updatePersonalClient } from '@/app/actions/personal-clients'
 import { toast } from 'sonner'
 import type { PersonalClient } from '@/types'
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  client?: PersonalClient | null
   initialName?: string
   onSuccess: (client: PersonalClient) => void
 }
 
-export function ClientDialog({ open, onOpenChange, initialName = '', onSuccess }: Props) {
+export function ClientDialog({ open, onOpenChange, client, initialName = '', onSuccess }: Props) {
   const [saving, setSaving] = useState(false)
   const [documentType, setDocumentType] = useState<'none' | 'cpf' | 'cnpj'>('none')
   
   // Form state
-  const [name, setName] = useState(initialName)
+  const [name, setName] = useState('')
   const [cpf, setCpf] = useState('')
   const [cnpj, setCnpj] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [notes, setNotes] = useState('')
 
-  // Reset form when dialog opens with new name
-  useState(() => {
+  const isEditing = !!client
+
+  // Reset form when dialog opens
+  useEffect(() => {
     if (open) {
-      setName(initialName)
-      setCpf('')
-      setCnpj('')
-      setPhone('')
-      setEmail('')
-      setNotes('')
-      setDocumentType('none')
+      if (client) {
+        // Modo edição: carregar dados do cliente
+        setName(client.name)
+        setCpf(client.cpf ? formatCpf(client.cpf) : '')
+        setCnpj(client.cnpj ? formatCnpj(client.cnpj) : '')
+        setPhone(client.phone ? formatPhone(client.phone) : '')
+        setEmail(client.email || '')
+        setNotes(client.notes || '')
+        setDocumentType(client.cpf ? 'cpf' : client.cnpj ? 'cnpj' : 'none')
+      } else {
+        // Modo criação: limpar form
+        setName(initialName)
+        setCpf('')
+        setCnpj('')
+        setPhone('')
+        setEmail('')
+        setNotes('')
+        setDocumentType('none')
+      }
     }
-  })
+  }, [open, client, initialName])
 
   function formatCpf(value: string): string {
     const numbers = value.replace(/\D/g, '').slice(0, 11)
@@ -88,17 +103,21 @@ export function ClientDialog({ open, onOpenChange, initialName = '', onSuccess }
     setSaving(true)
 
     try {
-      const result = await createPersonalClient({
+      const payload = {
         name: name.trim(),
         cpf: documentType === 'cpf' ? cpf.replace(/\D/g, '') : null,
         cnpj: documentType === 'cnpj' ? cnpj.replace(/\D/g, '') : null,
         phone: phone.replace(/\D/g, '') || null,
         email: email.trim() || null,
         notes: notes.trim() || null,
-      })
+      }
+
+      const result = isEditing
+        ? await updatePersonalClient(client.id, payload)
+        : await createPersonalClient(payload)
 
       if (result.success) {
-        toast.success('Cliente cadastrado')
+        toast.success(isEditing ? 'Cliente atualizado' : 'Cliente cadastrado')
         onSuccess(result.data)
         onOpenChange(false)
       } else {
@@ -113,7 +132,7 @@ export function ClientDialog({ open, onOpenChange, initialName = '', onSuccess }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Novo Cliente</DialogTitle>
+          <DialogTitle>{isEditing ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -191,7 +210,7 @@ export function ClientDialog({ open, onOpenChange, initialName = '', onSuccess }
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar'}
+              {saving ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar'}
             </Button>
           </div>
         </form>
@@ -199,4 +218,3 @@ export function ClientDialog({ open, onOpenChange, initialName = '', onSuccess }
     </Dialog>
   )
 }
-

@@ -119,6 +119,7 @@ export async function createPersonalClient(
     if (error) throw error
 
     revalidatePath('/minhasvendas')
+    revalidatePath('/clientes')
     return { success: true, data }
   } catch (err) {
     console.error('Error creating client:', err)
@@ -159,6 +160,7 @@ export async function updatePersonalClient(
 
     if (error) throw error
 
+    revalidatePath('/clientes')
     return { success: true, data }
   } catch (err) {
     console.error('Error updating client:', err)
@@ -178,6 +180,7 @@ export async function deletePersonalClient(id: string): Promise<ActionResult<voi
 
     if (error) throw error
 
+    revalidatePath('/clientes')
     return { success: true, data: undefined }
   } catch (err) {
     console.error('Error deleting client:', err)
