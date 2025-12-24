@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase-server'
+import { createClient } from '@/lib/supabase-server'
 import type { User, CreateUserInput, UpdateUserInput } from '@/types/user'
 
 /**
@@ -14,7 +14,7 @@ export const usersRepository = {
    * Busca usuário por ID
    */
   async findById(id: string): Promise<User | null> {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
     if (!supabase) throw new Error('Supabase não configurado')
 
     const { data, error } = await supabase.from('users').select('*').eq('id', id).single()
@@ -31,7 +31,7 @@ export const usersRepository = {
    * Busca usuário por email
    */
   async findByEmail(email: string): Promise<User | null> {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
     if (!supabase) throw new Error('Supabase não configurado')
 
     const { data, error } = await supabase.from('users').select('*').eq('email', email).single()
@@ -48,7 +48,7 @@ export const usersRepository = {
    * Lista usuários por organização
    */
   async findByOrganization(organizationId: string): Promise<User[]> {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
     if (!supabase) throw new Error('Supabase não configurado')
 
     const { data, error } = await supabase
@@ -70,7 +70,7 @@ export const usersRepository = {
   async findWithOrganization(
     id: string
   ): Promise<(User & { organization: { id: string; name: string } | null }) | null> {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
     if (!supabase) throw new Error('Supabase não configurado')
 
     const { data, error } = await supabase
@@ -96,7 +96,7 @@ export const usersRepository = {
    * Cria novo usuário
    */
   async create(input: CreateUserInput): Promise<User> {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
     if (!supabase) throw new Error('Supabase não configurado')
 
     const { data, error } = await supabase
@@ -119,7 +119,7 @@ export const usersRepository = {
    * Atualiza usuário
    */
   async update(id: string, input: UpdateUserInput): Promise<User> {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
     if (!supabase) throw new Error('Supabase não configurado')
 
     const { data, error } = await supabase
@@ -143,7 +143,7 @@ export const usersRepository = {
    * Remove usuário
    */
   async delete(id: string): Promise<void> {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
     if (!supabase) throw new Error('Supabase não configurado')
 
     const { error } = await supabase.from('users').delete().eq('id', id)

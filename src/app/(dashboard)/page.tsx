@@ -79,6 +79,7 @@ export default function DashboardPage() {
     async function checkMode() {
       if (!user) return
       const supabase = createClient()
+      if (!supabase) return
       const { data: pref } = await supabase
         .from('user_preferences')
         .select('user_mode')

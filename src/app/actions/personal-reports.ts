@@ -50,7 +50,8 @@ export async function getPersonalReportsData() {
   if (supplierError) throw supplierError
 
   const supplierRanking = supplierData.reduce((acc: any[], sale) => {
-    const name = sale.supplier?.name || 'Sem Fornecedor'
+    const supplier = sale.supplier as unknown as { name: string } | null
+    const name = supplier?.name || 'Sem Fornecedor'
     const existing = acc.find(a => a.name === name)
     if (existing) {
       existing.vendas += Number(sale.gross_value)

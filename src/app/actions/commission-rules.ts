@@ -95,7 +95,7 @@ export async function createCommissionRule(
 ): Promise<ActionResult<CommissionRule>> {
   const parsed = createRuleSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message }
+    return { success: false, error: parsed.error.issues[0].message }
   }
 
   const { type, percentage, tiers } = parsed.data
@@ -142,7 +142,7 @@ export async function updateCommissionRule(
 ): Promise<ActionResult<CommissionRule>> {
   const parsed = updateRuleSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message }
+    return { success: false, error: parsed.error.issues[0].message }
   }
 
   // Busca regra atual para validações

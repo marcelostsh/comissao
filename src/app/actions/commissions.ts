@@ -339,9 +339,9 @@ export async function getReportData(
 
   // Filtra por status da comissão
   if (commissionStatus === 'open') {
-    filtered = filtered.filter((s) => !s.commission?.id)
+    filtered = filtered.filter((s) => !s.commission?.is_closed)
   } else if (commissionStatus === 'closed') {
-    filtered = filtered.filter((s) => !!s.commission?.id)
+    filtered = filtered.filter((s) => !!s.commission?.is_closed)
   }
 
   const gross = filtered.reduce((sum, s) => sum + Number(s.gross_value), 0)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { useOrganization } from '@/contexts/organization-context'
@@ -26,7 +26,7 @@ import { toast } from 'sonner'
 import { Check, ExternalLink, Unplug, Users, Loader2, ShoppingCart, Pencil } from 'lucide-react'
 import type { IntegrationWithType } from '@/types'
 
-export default function ConfiguracoesPage() {
+function ConfiguracoesContent() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const { organization, loading: orgLoading, refresh: refreshOrg } = useOrganization()
@@ -548,6 +548,14 @@ export default function ConfiguracoesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  )
+}
+
+export default function ConfiguracoesPage() {
+  return (
+    <Suspense fallback={<div className="space-y-6"><div className="h-8 w-48 bg-muted animate-pulse rounded" /><div className="h-64 w-full bg-muted animate-pulse rounded" /></div>}>
+      <ConfiguracoesContent />
+    </Suspense>
   )
 }
 

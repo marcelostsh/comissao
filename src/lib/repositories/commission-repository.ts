@@ -114,8 +114,8 @@ export const commissionRepository = {
 
     for (const commission of data) {
       const sellerId = commission.seller_id
-      const seller = commission.seller as { id: string; name: string }
-      const sale = commission.sale as { gross_value: number; net_value: number }
+      const seller = commission.seller as unknown as { id: string; name: string }
+      const sale = commission.sale as unknown as { gross_value: number; net_value: number }
 
       if (!summaryMap.has(sellerId)) {
         summaryMap.set(sellerId, {

@@ -162,7 +162,7 @@ export async function createPersonalSupplierWithRule(
 ): Promise<ActionResult<PersonalSupplierWithRule>> {
   const parsed = createSupplierWithRuleSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message }
+    return { success: false, error: parsed.error.issues[0].message }
   }
 
   try {
@@ -238,7 +238,7 @@ export async function updatePersonalSupplierWithRule(
 ): Promise<ActionResult<PersonalSupplierWithRule>> {
   const parsed = updateSupplierWithRuleSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message }
+    return { success: false, error: parsed.error.issues[0].message }
   }
 
   try {

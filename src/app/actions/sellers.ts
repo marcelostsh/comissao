@@ -48,7 +48,7 @@ export async function createSeller(
 ): Promise<ActionResult<Seller>> {
   const parsed = createSellerSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message }
+    return { success: false, error: parsed.error.issues[0].message }
   }
 
   try {
@@ -72,7 +72,7 @@ export async function updateSeller(
 ): Promise<ActionResult<Seller>> {
   const parsed = updateSellerSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message }
+    return { success: false, error: parsed.error.issues[0].message }
   }
 
   try {
