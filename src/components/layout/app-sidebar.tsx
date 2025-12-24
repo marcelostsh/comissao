@@ -22,6 +22,7 @@ import { useTheme } from 'next-themes'
 import Image from 'next/image'
 import { getPerformanceStats } from '@/app/actions/user-preferences'
 import { GoalDialog } from '@/components/dashboard/goal-dialog'
+import { UsageWidget } from '@/components/billing/usage-widget'
 
 type UserMode = 'personal' | 'organization' | null
 
@@ -163,6 +164,7 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
       <SidebarFooter>
+        <UsageWidget />
         {userMode === 'personal' && <PerformanceWidget />}
       </SidebarFooter>
     </Sidebar>

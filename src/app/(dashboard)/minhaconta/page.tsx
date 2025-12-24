@@ -4,10 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/auth-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { LogOut } from 'lucide-react'
+import { LogOut, CreditCard } from 'lucide-react'
+import { useState } from 'react'
+import { PlanSelectionDialog } from '@/components/billing/plan-selection-dialog'
 
 export default function MinhaContaPage() {
   const { user, signOut } = useAuth()
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
 
   const initials = user?.user_metadata?.full_name
     ?.split(' ')
@@ -45,6 +48,24 @@ export default function MinhaContaPage() {
       </Card>
 
       <Card>
+        <CardHeader>
+          <CardTitle>Plano e Faturamento</CardTitle>
+          <CardDescription>Gerencie sua assinatura e limites</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+            <div>
+              <p className="font-semibold">Plano Atual: FREE</p>
+              <p className="text-sm text-muted-foreground">Você está usando a versão gratuita com limites reduzidos.</p>
+            </div>
+            <Button variant="default" size="sm" onClick={() => setIsPlanModalOpen(true)}>
+              Fazer Upgrade
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="pt-6">
           <Button variant="destructive" onClick={signOut} className="w-full">
             <LogOut className="mr-2 h-4 w-4" />
@@ -52,6 +73,11 @@ export default function MinhaContaPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <PlanSelectionDialog 
+        open={isPlanModalOpen} 
+        onOpenChange={setIsPlanModalOpen} 
+      />
     </div>
   )
 }
