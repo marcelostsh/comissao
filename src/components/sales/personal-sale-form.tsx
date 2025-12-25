@@ -638,7 +638,7 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
                                   {new Intl.NumberFormat('pt-BR', {
                                     style: 'currency',
                                     currency: 'BRL',
-                                  }).format(totalValue / installments)}
+                                  }).format(totalValue / Number(installments))}
                                 </span>
                               </>
                             ) : (
@@ -784,8 +784,8 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
         open={installmentsSheetOpen}
         onOpenChange={setInstallmentsSheetOpen}
         saleDate={saleDate}
-        installments={installments}
-        interval={interval}
+        installments={Number(installments)}
+        interval={Number(interval)}
         totalValue={totalValue}
         commissionPercentage={commissionPercentage}
       />
