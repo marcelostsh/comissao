@@ -90,18 +90,30 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
   }
 
   const [paymentType, setPaymentType] = useState<'vista' | 'parcelado'>(initialPayment.type)
-  const [installments, setInstallments] = useState(initialPayment.installments)
-  const [interval, setInterval] = useState(initialPayment.interval) // Esse é o prazo entre parcelas (ex: 30)
+  // States agora armazenam string para permitir vazio durante digitação
+  const [installments, setInstallments] = useState<string | number>(initialPayment.installments)
+  const [interval, setInterval] = useState<string | number>(initialPayment.interval)
+  const [firstInstallmentDays, setFirstInstallmentDays] = useState<string | number>(30)
+
+  const [quickCondition, setQuickCondition] = useState('') // Novo campo facilitador
   
-  // State auxiliar para "Dias até a 1ª parcela"
-  const [firstInstallmentDays, setFirstInstallmentDays] = useState<number>(30)
+  // Flag para evitar loop de atualização quando o update vem do próprio input mágico
+  const [isUpdatingFromQuick, setIsUpdatingFromQuick] = useState(false)
+
+  // Função auxiliar para obter valor numérico seguro dos states
+  const getSafeNumber = (val: string | number, min: number = 0) => {
+    if (val === '' || val === undefined || val === null) return min
+    const num = typeof val === 'string' ? parseInt(val) : val
+    return isNaN(num) ? min : num
+  }
   
   // Inicializa a data da primeira parcela se não estiver definida
   useMemo(() => {
     if (paymentType === 'parcelado' && !firstInstallmentDate) {
       // Usa o valor padrão de 30 dias se não tiver data definida
-      setFirstInstallmentDate(calculateDateFromDays(30, saleDate))
-      setFirstInstallmentDays(30)
+      const safeInterval = getSafeNumber(interval, 30)
+      setFirstInstallmentDate(calculateDateFromDays(safeInterval, saleDate))
+      setFirstInstallmentDays(safeInterval)
     } else if (paymentType === 'parcelado' && firstInstallmentDate && saleDate) {
       // Se já tem data, calcula os dias
       const days = calculateDaysFromDate(firstInstallmentDate, saleDate)
@@ -110,10 +122,12 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
   }, [paymentType, saleDate, firstInstallmentDate]) // Removido 'interval' das dependências
 
   // Handler para "Dias até 1ª Parcela"
-  const handleFirstInstallmentDaysChange = (days: number) => {
-    const newDays = Math.max(0, days)
-    setFirstInstallmentDays(newDays)
-    setFirstInstallmentDate(calculateDateFromDays(newDays, saleDate))
+  const handleFirstInstallmentDaysChange = (val: string) => {
+    setFirstInstallmentDays(val)
+    const days = parseInt(val)
+    if (!isNaN(days)) {
+      setFirstInstallmentDate(calculateDateFromDays(days, saleDate))
+    }
   }
 
   // Handler para "Data 1ª Parcela"
@@ -129,9 +143,73 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
   const handleSaleDateChange = (date: string) => {
     setSaleDate(date)
     if (paymentType === 'parcelado') {
-      setFirstInstallmentDate(calculateDateFromDays(firstInstallmentDays, date))
+      const days = getSafeNumber(firstInstallmentDays, 30)
+      setFirstInstallmentDate(calculateDateFromDays(days, date))
     }
   }
+
+  // Parser de condição rápida (ex: 30/60/90)
+  // Agora só roda no Blur para não atrapalhar a digitação
+  const handleQuickConditionBlur = () => {
+    setIsUpdatingFromQuick(true) // Marca que estamos atualizando via input mágico
+    
+    // Normaliza separadores para barra
+    const normalized = quickCondition.replace(/[\s,-]+/g, '/')
+    
+    // Tenta fazer o parse apenas se tiver números
+    const parts = normalized.split('/').map(p => parseInt(p.trim())).filter(n => !isNaN(n))
+    
+    if (parts.length > 0) {
+      // Reconstrói a string formatada bonitinha
+      setQuickCondition(parts.join('/'))
+
+      const first = parts[0]
+      const count = parts.length
+      
+      // Se tiver mais de 1 número, tenta inferir o intervalo
+      let detectedInterval = getSafeNumber(interval, 30)
+
+      if (parts.length > 1) {
+        detectedInterval = parts[1] - parts[0]
+      } else if (parts.length === 1 && first > 0) {
+         detectedInterval = 30 
+      }
+
+      if (detectedInterval <= 0) detectedInterval = 30 
+
+      // Atualiza os estados
+      setInstallments(count)
+      setFirstInstallmentDays(first)
+      setFirstInstallmentDate(calculateDateFromDays(first, saleDate))
+      setInterval(detectedInterval)
+    }
+    
+    // Pequeno delay para liberar a flag, garantindo que o effect de reconstrução não rode
+    // imediatamente após este update
+    setTimeout(() => setIsUpdatingFromQuick(false), 100)
+  }
+
+  // Effect para reconstruir a string mágica quando os campos individuais mudam
+  // SÓ RODA se não estivermos digitando no campo mágico
+  useMemo(() => {
+    if (isUpdatingFromQuick) {
+      return
+    }
+
+    if (paymentType === 'parcelado') {
+      const safeInstallments = getSafeNumber(installments, 1)
+      const safeInterval = getSafeNumber(interval, 30)
+      const safeFirstDays = getSafeNumber(firstInstallmentDays, 30)
+
+      const parts = []
+      for (let i = 0; i < safeInstallments; i++) {
+        parts.push(safeFirstDays + (i * safeInterval))
+      }
+      setQuickCondition(parts.join('/'))
+    }
+  }, [installments, interval, firstInstallmentDays, paymentType, isUpdatingFromQuick])
+
+
 
   const [notes, setNotes] = useState(sale?.notes || '')
   const [entryMode, setEntryMode] = useState<'total' | 'items'>(
@@ -160,7 +238,7 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
   // Calcula a condição de pagamento baseado nos inputs
   const paymentCondition = paymentType === 'vista'
     ? ''
-    : Array.from({ length: installments }, (_, i) => (i + 1) * interval).join('/')
+    : Array.from({ length: getSafeNumber(installments, 1) }, (_, i) => (i + 1) * getSafeNumber(interval, 30)).join('/')
 
   // Client dialog state
   const [clientDialogOpen, setClientDialogOpen] = useState(false)
@@ -228,27 +306,30 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
 
   // Calcula datas da primeira e última parcela
   const installmentDates = useMemo(() => {
-    if (paymentType !== 'parcelado' || !firstInstallmentDate) return null
+    if (paymentType !== 'parcelado') return null
+    // Alterado para permitir visualização mesmo sem data explícita (usando fallback)
     
-    const firstDate = new Date(firstInstallmentDate + 'T12:00:00')
+    const safeInstallments = getSafeNumber(installments, 1)
+    const safeInterval = getSafeNumber(interval, 30)
+
+    let firstDate: Date
+    if (firstInstallmentDate) {
+       firstDate = new Date(firstInstallmentDate + 'T12:00:00')
+    } else {
+       // Fallback se data estiver vazia durante digitação
+       const safeFirstDays = getSafeNumber(firstInstallmentDays, 30)
+       firstDate = new Date(calculateDateFromDays(safeFirstDays, saleDate) + 'T12:00:00')
+    }
+
     const lastDate = new Date(firstDate)
     
-    // A primeira parcela é "firstDate", então sobram (installments - 1) parcelas para frente
-    // Assumindo que as demais parcelas seguem o mesmo intervalo (30 dias padrão entre elas ou o intervalo calculado)
-    // O intervalo entre parcelas subsequentes geralmente é fixo (ex: 30 dias), mesmo que o primeiro seja diferente (ex: 45)
-    // Se o usuário mudou o "prazo" para 45 dias, isso é o prazo DA PRIMEIRA. As outras costumam ser a cada 30.
-    // MAS, no seu modelo atual, "interval" é usado para tudo.
-    // Vou manter a lógica onde 'interval' é o espaçamento entre todas. 
-    // Se quiser que a primeira seja 45 e as outras 30, precisaríamos de dois campos: "Prazo 1ª" e "Intervalo Demais".
-    // Por enquanto, vou assumir que o intervalo calculado se aplica a todas.
-    
-    lastDate.setDate(lastDate.getDate() + ((installments - 1) * interval))
+    lastDate.setDate(lastDate.getDate() + ((safeInstallments - 1) * safeInterval))
     
     return {
       first: new Intl.DateTimeFormat('pt-BR').format(firstDate),
       last: new Intl.DateTimeFormat('pt-BR').format(lastDate),
     }
-  }, [paymentType, installments, interval, firstInstallmentDate])
+  }, [paymentType, installments, interval, firstInstallmentDate, firstInstallmentDays, saleDate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -301,6 +382,9 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
           unit_price,
         })) : [],
       }
+
+      // Garante que interval/installments sejam números válidos no payload se necessário
+      // (aqui eles não vão direto pro payload, mas são usados pra calcular payment_condition)
 
       const result = isEdit
         ? await updatePersonalSale(sale.id, payload)
@@ -462,6 +546,30 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
 
                 {paymentType === 'parcelado' && (
                   <div className="space-y-3 pt-2">
+                    
+                    {/* Novo campo facilitador */}
+                    <div className="space-y-1">
+                      <Label htmlFor="quick_condition" className="text-xs font-medium text-blue-600">
+                        Condição Rápida (ex: 30/60/90)
+                      </Label>
+                      <Input
+                        id="quick_condition"
+                        placeholder="Digite os dias..."
+                        value={quickCondition}
+                        onChange={(e) => {
+                          setQuickCondition(e.target.value)
+                          setIsUpdatingFromQuick(true) // Pausa updates reversos enquanto digita
+                        }}
+                        onBlur={handleQuickConditionBlur}
+                        className="border-blue-200 focus-visible:ring-blue-500"
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        Preenche automaticamente parcelas e prazos.
+                      </p>
+                    </div>
+
+                    <Separator className="my-2" />
+
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label htmlFor="installments" className="text-xs">
@@ -472,7 +580,8 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
                           type="number"
                           min={1}
                           value={installments}
-                          onChange={(e) => setInstallments(Math.max(1, parseInt(e.target.value) || 1))}
+                          onChange={(e) => setInstallments(e.target.value)}
+                          onBlur={(e) => setInstallments(Math.max(1, parseInt(e.target.value) || 1))}
                         />
                       </div>
                       <div className="space-y-1">
@@ -484,7 +593,8 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
                           type="number"
                           min={1}
                           value={interval}
-                          onChange={(e) => setInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                          onChange={(e) => setInterval(e.target.value)}
+                          onBlur={(e) => setInterval(Math.max(1, parseInt(e.target.value) || 1))}
                         />
                       </div>
                     </div>
@@ -499,7 +609,7 @@ export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySuppli
                           type="number"
                           min={0}
                           value={firstInstallmentDays}
-                          onChange={(e) => handleFirstInstallmentDaysChange(parseInt(e.target.value) || 0)}
+                          onChange={(e) => handleFirstInstallmentDaysChange(e.target.value)}
                         />
                       </div>
                       <div className="space-y-1">
