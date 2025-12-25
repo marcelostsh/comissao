@@ -160,7 +160,7 @@ export const RuleForm = forwardRef<RuleFormRef, Props>(function RuleForm(
             max="100"
             value={percentage}
             onChange={(e) => setPercentage(e.target.value)}
-            placeholder="5"
+            placeholder="Ex: 5"
           />
         </div>
       )}
