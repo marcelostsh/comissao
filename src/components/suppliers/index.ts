@@ -1,1 +1,2 @@
-export { SupplierTable } from './supplier-table'
+export * from './supplier-table'
+export * from './supplier-dialog'

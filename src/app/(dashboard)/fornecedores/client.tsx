@@ -1,10 +1,11 @@
 'use client'
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Plus, Building2 } from 'lucide-react'
-import { SupplierTable } from '@/components/suppliers'
-import Link from 'next/link'
+import { SupplierTable, SupplierDialog } from '@/components/suppliers'
 import type { PersonalSupplierWithRule } from '@/app/actions/personal-suppliers'
 
 type Props = {
@@ -12,7 +13,16 @@ type Props = {
 }
 
 export function FornecedoresClient({ initialSuppliers }: Props) {
-  const hasSuppliers = initialSuppliers.length > 0
+  const router = useRouter()
+  const [suppliers, setSuppliers] = useState(initialSuppliers)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  
+  const hasSuppliers = suppliers.length > 0
+
+  function handleSupplierCreated(newSupplier: PersonalSupplierWithRule) {
+    setSuppliers(prev => [...prev, newSupplier])
+    router.refresh()
+  }
 
   return (
     <div className="space-y-6">
@@ -21,16 +31,14 @@ export function FornecedoresClient({ initialSuppliers }: Props) {
           <h1 className="text-2xl font-bold tracking-tight">Minhas Pastas</h1>
           <p className="text-muted-foreground">Empresas que você representa</p>
         </div>
-        <Button size="sm" asChild>
-          <Link href="/fornecedores/novo">
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar
-          </Link>
+        <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Adicionar
         </Button>
       </div>
 
       {hasSuppliers ? (
-        <SupplierTable suppliers={initialSuppliers} />
+        <SupplierTable suppliers={suppliers} />
       ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -39,15 +47,19 @@ export function FornecedoresClient({ initialSuppliers }: Props) {
             <p className="mb-4 text-sm text-muted-foreground">
               Adicione as empresas/fábricas que você representa para começar a auditar suas comissões.
             </p>
-            <Button asChild>
-              <Link href="/fornecedores/novo">
-                <Plus className="mr-2 h-4 w-4" />
-                Adicionar Pasta
-              </Link>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar Pasta
             </Button>
           </CardContent>
         </Card>
       )}
+
+      <SupplierDialog 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen}
+        onSuccess={handleSupplierCreated}
+      />
     </div>
   )
 }

@@ -21,6 +21,7 @@ import { Plus, Eye } from 'lucide-react'
 import { SaleItemsEditor } from './sale-items-editor'
 import { InstallmentsSheet } from './installments-sheet'
 import { ClientCombobox, ClientDialog } from '@/components/clients'
+import { SupplierDialog } from '@/components/suppliers'
 import { createPersonalSale, updatePersonalSale } from '@/app/actions/personal-sales'
 import { toast } from 'sonner'
 import type { PersonalSupplierWithRule } from '@/app/actions/personal-suppliers'
@@ -55,10 +56,12 @@ function parsePaymentCondition(condition: string | null): { type: 'vista' | 'par
   }
 }
 
-export function PersonalSaleForm({ suppliers, productsBySupplier, sale, mode = 'create' }: Props) {
+export function PersonalSaleForm({ suppliers: initialSuppliers, productsBySupplier, sale, mode = 'create' }: Props) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const isEdit = mode === 'edit' && !!sale
+
+  const [suppliersList, setSuppliersList] = useState(initialSuppliers)
 
   // Parse condição de pagamento inicial
   const initialPayment = parsePaymentCondition(sale?.payment_condition ?? null)
@@ -98,6 +101,9 @@ export function PersonalSaleForm({ suppliers, productsBySupplier, sale, mode = '
   const [clientDialogOpen, setClientDialogOpen] = useState(false)
   const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0)
 
+  // Supplier dialog state
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false)
+
   // Installments sheet state
   const [installmentsSheetOpen, setInstallmentsSheetOpen] = useState(false)
 
@@ -113,8 +119,8 @@ export function PersonalSaleForm({ suppliers, productsBySupplier, sale, mode = '
 
   // Obtém regra de comissão do fornecedor selecionado
   const selectedSupplier = useMemo(() => {
-    return suppliers.find((s) => s.id === supplierId)
-  }, [suppliers, supplierId])
+    return suppliersList.find((s) => s.id === supplierId)
+  }, [suppliersList, supplierId])
 
   const commissionPercentage = useMemo(() => {
     const rule = selectedSupplier?.commission_rule
@@ -229,6 +235,11 @@ export function PersonalSaleForm({ suppliers, productsBySupplier, sale, mode = '
     setClientRefreshTrigger((prev) => prev + 1)
   }
 
+  function handleSupplierCreated(supplier: PersonalSupplierWithRule) {
+    setSuppliersList((prev) => [...prev, supplier])
+    setSupplierId(supplier.id)
+  }
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -247,17 +258,20 @@ export function PersonalSaleForm({ suppliers, productsBySupplier, sale, mode = '
                       <SelectValue placeholder="Selecione o fornecedor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {suppliers.map((supplier) => (
+                      {suppliersList.map((supplier) => (
                         <SelectItem key={supplier.id} value={supplier.id}>
                           {supplier.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" size="icon" asChild>
-                    <Link href="/fornecedores/novo">
-                      <Plus className="h-4 w-4" />
-                    </Link>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setSupplierDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -495,6 +509,12 @@ export function PersonalSaleForm({ suppliers, productsBySupplier, sale, mode = '
         open={clientDialogOpen}
         onOpenChange={setClientDialogOpen}
         onSuccess={handleClientCreated}
+      />
+
+      <SupplierDialog
+        open={supplierDialogOpen}
+        onOpenChange={setSupplierDialogOpen}
+        onSuccess={handleSupplierCreated}
       />
 
       <InstallmentsSheet
