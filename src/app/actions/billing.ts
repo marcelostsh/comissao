@@ -248,10 +248,14 @@ export async function decrementUsage(
   }
 }
 
+export type CreateSubscriptionResult = 
+  | { success: true; subscriptionId: string; invoiceUrl: string }
+  | { success: false; error: string; message: string }
+
 /**
  * Inicia o processo de assinatura com o Asaas.
  */
-export async function createSubscriptionAction(planId: string) {
+export async function createSubscriptionAction(planId: string): Promise<CreateSubscriptionResult> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Usuário não autenticado')
@@ -421,7 +425,7 @@ export async function createSubscriptionAction(planId: string) {
 
     if (subError) throw subError
 
-    const retorno = { 
+    const retorno: CreateSubscriptionResult = { 
       success: true, 
       subscriptionId: asaasSub.id,
       invoiceUrl: invoiceUrl // URL garantida agora
