@@ -2,10 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Rotas exclusivas de vendedor (modo personal)
-const PERSONAL_ROUTES = ['/home', '/minhasvendas', '/fornecedores', '/recebiveis', '/minhaconta']
+const PERSONAL_ROUTES = ['/home', '/minhasvendas', '/fornecedores', '/recebiveis']
 
 // Rotas exclusivas de empresa (modo organization)
 const ORG_ROUTES = ['/', '/vendas', '/vendedores', '/regras', '/relatorios', '/configuracoes']
+
+// Rotas acessíveis em qualquer modo (não devem forçar redirect por modo)
+const NEUTRAL_ROUTES = ['/minhaconta']
 
 // Rotas que não exigem modo definido
 const PUBLIC_AUTH_ROUTES = ['/login', '/onboarding', '/auth/callback', '/reset-password']
@@ -104,17 +107,18 @@ export async function middleware(request: NextRequest) {
       }
 
       // Verificar se está tentando acessar rota do modo errado
+      const isNeutralRoute = NEUTRAL_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
       const isPersonalRoute = PERSONAL_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
       const isOrgRoute = ORG_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
 
-      if (pref?.user_mode === 'personal' && isOrgRoute) {
+      if (!isNeutralRoute && pref?.user_mode === 'personal' && isOrgRoute) {
         // Vendedor tentando acessar rota de empresa
         const url = request.nextUrl.clone()
         url.pathname = '/home'
         return NextResponse.redirect(url)
       }
 
-      if (pref?.user_mode === 'organization' && isPersonalRoute) {
+      if (!isNeutralRoute && pref?.user_mode === 'organization' && isPersonalRoute) {
         // Empresa tentando acessar rota de vendedor
         const url = request.nextUrl.clone()
         url.pathname = '/'

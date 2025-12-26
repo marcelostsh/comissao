@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/auth-context'
 import { useUser } from '@/contexts/user-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { LogOut, User as UserIcon, Pencil } from 'lucide-react'
+import { LogOut, Pencil, Eye, EyeOff, Server, Copy, Check } from 'lucide-react'
 import { useState } from 'react'
 import { PlanSelectionDialog } from '@/components/billing/plan-selection-dialog'
 import { ProfileForm } from '@/components/profile/profile-form'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -17,12 +18,51 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { getEnvironmentVariables, EnvironmentVariable } from '@/app/actions/profiles'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
 export default function MinhaContaPage() {
   const { signOut } = useAuth()
   const { profile } = useUser()
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [envVars, setEnvVars] = useState<EnvironmentVariable[]>([])
+  const [envVarsLoading, setEnvVarsLoading] = useState(false)
+  const [envVarsOpen, setEnvVarsOpen] = useState(false)
+  const [showSecrets, setShowSecrets] = useState(false)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  const loadEnvVars = async () => {
+    if (envVars.length > 0) return // já carregou
+    setEnvVarsLoading(true)
+    const result = await getEnvironmentVariables()
+    if (result.success && result.data) {
+      setEnvVars(result.data)
+    }
+    setEnvVarsLoading(false)
+  }
+
+  const handleEnvVarsToggle = (open: boolean) => {
+    setEnvVarsOpen(open)
+    if (open) loadEnvVars()
+  }
+
+  const maskValue = (value: string | undefined) => {
+    if (!value) return '(não configurada)'
+    if (value.length <= 12) return '••••••••'
+    return `${value.slice(0, 6)}...${value.slice(-6)}`
+  }
+
+  const copyToClipboard = async (key: string, value: string | undefined) => {
+    if (!value) return
+    await navigator.clipboard.writeText(value)
+    setCopiedKey(key)
+    setTimeout(() => setCopiedKey(null), 2000)
+  }
 
   const formatDocument = (value: string | null) => {
     if (!value) return ''
@@ -86,7 +126,12 @@ export default function MinhaContaPage() {
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-semibold text-lg">{name}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-lg">{name}</p>
+                {profile?.is_super_admin && (
+                  <Badge variant="secondary">Admin do Sistema</Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">{profile?.email}</p>
               {profile?.document && (
                 <p className="text-sm text-muted-foreground mt-1">
@@ -115,6 +160,83 @@ export default function MinhaContaPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Seção exclusiva para Super Admin */}
+      {profile?.is_super_admin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Server className="h-5 w-5" />
+              Variáveis de Ambiente
+            </CardTitle>
+            <CardDescription>
+              Visualize as configurações do ambiente atual (apenas super admin)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Collapsible open={envVarsOpen} onOpenChange={handleEnvVarsToggle}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" className="w-full justify-between">
+                  {envVarsOpen ? 'Ocultar variáveis' : 'Mostrar variáveis'}
+                  {envVarsOpen ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                {envVarsLoading ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-sm text-muted-foreground">
+                        {showSecrets ? 'Valores visíveis' : 'Valores mascarados'}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSecrets(!showSecrets)}
+                      >
+                        {showSecrets ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                        {showSecrets ? 'Mascarar' : 'Revelar'}
+                      </Button>
+                    </div>
+                    {envVars.map((env) => (
+                      <div
+                        key={env.key}
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm font-medium">{env.key}</code>
+                            {env.isPublic && (
+                              <Badge variant="outline" className="text-xs">PUBLIC</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground font-mono truncate mt-1">
+                            {showSecrets ? (env.value || '(não configurada)') : maskValue(env.value)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="ml-2 flex-shrink-0"
+                          onClick={() => copyToClipboard(env.key, env.value)}
+                          disabled={!env.value}
+                        >
+                          {copiedKey === env.key ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="pt-6">

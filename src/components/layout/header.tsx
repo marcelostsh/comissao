@@ -17,6 +17,7 @@ import { ThemeToggle } from './theme-toggle'
 import { LogOut, User } from 'lucide-react'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { Badge } from '@/components/ui/badge'
 
 export function Header() {
   const { signOut } = useAuth()
@@ -64,9 +65,14 @@ export function Header() {
         <DropdownMenuContent className="w-56" align="end" forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">
-                {name}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium leading-none">{name}</p>
+                {profile?.is_super_admin && (
+                  <Badge variant="secondary" className="h-5 px-2 py-0 text-[10px]">
+                    Admin
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs leading-none text-muted-foreground">{profile?.email}</p>
             </div>
           </DropdownMenuLabel>

@@ -18,6 +18,7 @@ type UserProfile = {
   document: string | null
   document_type: 'CPF' | 'CNPJ' | null
   avatar_url: string | null
+  is_super_admin: boolean
   emails: UserEmail[]
 }
 
@@ -71,6 +72,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         document: dbProfile?.document || null,
         document_type: dbProfile?.document_type || null,
         avatar_url: user.user_metadata?.avatar_url || null,
+        is_super_admin: Boolean(dbProfile?.is_super_admin),
         emails: emails || [],
       }
 
