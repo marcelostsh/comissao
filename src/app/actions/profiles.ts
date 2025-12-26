@@ -89,9 +89,8 @@ export async function getEnvironmentVariables(): Promise<{ success: boolean; dat
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
-  if (!user) {
+  if (!user)
     return { success: false, error: 'Usuário não autenticado' }
-  }
 
   // Verificar se é super admin no banco
   const { data: profile } = await supabase
