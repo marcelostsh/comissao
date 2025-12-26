@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { Home, Users, Scale, ShoppingCart, BarChart3, Building2, Settings, PlusCircle, Target } from 'lucide-react'
+import { Home, Users, Scale, ShoppingCart, BarChart3, Building2, Settings, PlusCircle, Target, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
@@ -29,7 +29,7 @@ type UserMode = 'personal' | 'organization' | null
 type MenuItem = {
   title: string
   url: string
-  icon: any
+  icon: React.ElementType
 }
 
 type MenuSection = {
@@ -56,6 +56,7 @@ const orgMenuSections: MenuSection[] = [
   {
     label: 'Sistema',
     items: [
+      { title: 'Faturamento', url: '/cobrancas', icon: CreditCard },
       { title: 'Configurações', url: '/configuracoes', icon: Settings },
     ],
   },
@@ -81,6 +82,7 @@ const personalMenuSections: MenuSection[] = [
     label: 'Resultados',
     items: [
       { title: 'Relatórios', url: '/relatorios-vendedor', icon: BarChart3 },
+      { title: 'Faturamento', url: '/cobrancas', icon: CreditCard },
     ],
   },
 ]

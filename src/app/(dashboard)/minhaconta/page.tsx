@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/auth-context'
 import { useUser } from '@/contexts/user-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { LogOut, Pencil, Eye, EyeOff, Server, Copy, Check } from 'lucide-react'
+import { LogOut, Pencil, Eye, EyeOff, Server, Copy, Check, ArrowRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { PlanSelectionDialog } from '@/components/billing/plan-selection-dialog'
 import { ProfileForm } from '@/components/profile/profile-form'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
 import {
   Dialog,
   DialogContent,
@@ -189,6 +190,16 @@ export default function MinhaContaPage() {
               {subscription ? 'Gerenciar Plano' : 'Fazer Upgrade'}
             </Button>
           </div>
+          {subscription && (
+            <div className="pt-2">
+              <Button variant="link" className="p-0 h-auto text-primary gap-1" asChild>
+                <Link href="/cobrancas">
+                  Ver histórico de faturas e pagamentos
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

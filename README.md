@@ -1,4 +1,4 @@
-# uComiss
+# uComis
 
 Motor de cálculo de comissões para PMEs. Conecta ao CRM, aplica regras configuráveis, elimina planilhas.
 

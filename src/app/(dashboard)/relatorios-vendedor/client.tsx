@@ -5,8 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
-  ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip 
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid 
 } from 'recharts'
 import {
   ChartConfig,
@@ -17,10 +16,9 @@ import {
   ChartLegendContent,
 } from '@/components/ui/chart'
 import { formatCurrency } from '@/lib/utils'
-import { getPersonalReportsData } from '@/app/actions/personal-reports'
+import { getPersonalReportsData, type ReportsData, type ReportFunnel, type ReportClient } from '@/app/actions/personal-reports'
 import { format, parseISO } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
-import { PlusCircle, BarChart2, TrendingUp, Users, Package, PieChart as PieChartIcon, Rocket } from 'lucide-react'
+import { PlusCircle, TrendingUp, Users, Package, PieChart as PieChartIcon, Rocket } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
@@ -46,7 +44,7 @@ function EmptyState({
   action,
   className
 }: { 
-  icon: any, 
+  icon: React.ElementType, 
   title: string, 
   description: string, 
   action?: { label: string, href: string },
@@ -75,7 +73,7 @@ function EmptyState({
 
 export default function PersonalReportsClient() {
   const [loading, setLoading] = useState(true)
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<ReportsData | null>(null)
 
   useEffect(() => {
     async function loadData() {
@@ -233,7 +231,7 @@ export default function PersonalReportsClient() {
               <CardContent className="h-[300px]">
                 {hasSales ? (
                   <div className="flex flex-col justify-center h-full space-y-8">
-                    {data.commissionFunnel.map((item: any) => (
+                    {data.commissionFunnel.map((item: ReportFunnel) => (
                       <div key={item.name} className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium">{item.name}</span>
@@ -311,7 +309,7 @@ export default function PersonalReportsClient() {
                       </tr>
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
-                      {data.clientABC.map((client: any) => (
+                      {data.clientABC.map((client: ReportClient) => (
                         <tr key={client.name} className="border-b transition-colors hover:bg-muted/50">
                           <td className="p-4 align-middle font-medium">{client.name}</td>
                           <td className="p-4 align-middle text-right">{formatCurrency(client.total)}</td>

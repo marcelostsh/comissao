@@ -24,7 +24,6 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith('/login')
   const isOnboardingPage = pathname.startsWith('/onboarding')
-  const isCallbackPage = pathname.startsWith('/auth/callback')
   const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.some(route => pathname.startsWith(route))
 
   // Se Supabase não está configurado, redireciona para login

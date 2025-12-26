@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { ThemeToggle } from './theme-toggle'
-import { LogOut, User } from 'lucide-react'
+import { LogOut, User, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +25,8 @@ export function Header() {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    const timeout = setTimeout(() => setMounted(true), 0)
+    return () => clearTimeout(timeout)
   }, [])
 
   const name = profile?.name || 'Usuário'
@@ -81,6 +82,12 @@ export function Header() {
             <Link href="/minhaconta">
               <User className="mr-2 h-4 w-4" />
               <span>Minha Conta</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/cobrancas">
+              <CreditCard className="mr-2 h-4 w-4" />
+              <span>Faturamento</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

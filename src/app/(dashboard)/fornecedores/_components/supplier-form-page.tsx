@@ -10,7 +10,7 @@ import { RuleForm, type RuleFormRef } from '@/components/rules'
 import { ProductTable, ProductDialog } from '@/components/products'
 import { createPersonalSupplierWithRule, updatePersonalSupplierWithRules } from '@/app/actions/personal-suppliers'
 import { toast } from 'sonner'
-import { ArrowLeft, Loader2, Plus, Package, Trash2, Edit2, Star, Check } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, Package, Trash2, Edit2, Star } from 'lucide-react'
 import Link from 'next/link'
 import type { PersonalSupplier } from '@/app/actions/personal-suppliers'
 import type { CommissionRule, Product } from '@/types'
@@ -377,7 +377,7 @@ export function SupplierFormPage({ supplier, products = [] }: Props) {
                     <div className="flex flex-col items-center justify-center py-12 text-center h-full">
                       <Package className="mb-4 h-10 w-10 text-muted-foreground/50" />
                       <p className="text-sm text-muted-foreground">
-                        Nenhum produto cadastrado. Clique em "Adicionar" para começar.
+                        Nenhum produto cadastrado. Clique em &quot;Adicionar&quot; para começar.
                       </p>
                     </div>
                   )}

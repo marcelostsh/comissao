@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase'
 import { setupTrialSubscription } from '@/app/actions/billing'
 import { toast } from 'sonner'
@@ -86,7 +85,7 @@ export default function OnboardingPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Como deseja usar o uComiss?</CardTitle>
+          <CardTitle className="text-2xl">Como deseja usar o uComis?</CardTitle>
           <CardDescription>
             Escolha o modo que melhor se adapta ao seu perfil
           </CardDescription>
