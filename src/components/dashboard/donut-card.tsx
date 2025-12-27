@@ -79,7 +79,8 @@ export function DonutCard({ title, value, data }: DonutCardProps) {
                   nameKey="name"
                   innerRadius="50%"
                   outerRadius="100%"
-                  paddingAngle={2}
+                  paddingAngle={5}
+                  cornerRadius={2}
                   strokeWidth={0}
                 >
                   {data.map((entry, index) => (
