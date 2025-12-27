@@ -33,10 +33,10 @@ export function DonutCard({ title, value, subtitle, data }: DonutCardProps) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
 
   return (
-    <Card className="border-none shadow-sm h-full">
-      <CardContent className="flex items-start justify-between gap-4 p-4 md:p-6 pb-6 h-full">
+    <Card className="border-none shadow-sm h-full py-3 md:py-6">
+      <CardContent className="flex items-start justify-between gap-4 px-3 md:px-6 h-full">
         <div className="flex-1 min-w-0">
-          <CardTitle className="text-xl font-bold">{title}</CardTitle>
+          <CardTitle className="text-sm md:text-base font-semibold">{title}</CardTitle>
           <div className="text-3xl md:text-4xl font-bold pt-1">{value}</div>
           {subtitle && (
             <p className="text-sm text-muted-foreground">{subtitle}</p>

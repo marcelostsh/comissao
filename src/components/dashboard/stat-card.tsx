@@ -16,13 +16,13 @@ export function StatCard({ label, value, icon: Icon, percentage, percentageLabel
   return (
     <Card className="border-none shadow-sm h-fit py-3 md:py-6">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        <Icon className="h-5 w-5 text-muted-foreground" />
+        <CardTitle className="text-sm md:text-base font-semibold">{label}</CardTitle>
+        <Icon className="h-5 w-5 md:h-6 md:w-6" />
       </CardHeader>
       <CardContent className="px-3 md:px-6">
-        <div className="text-4xl font-bold">{value}</div>
+        <div className="text-2xl md:text-4xl font-bold">{value}</div>
         <div className="flex items-center gap-1 mt-2">
-          <span className={`flex items-center text-sm font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+          <span className={`flex items-center text-xs md:text-sm font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
             {isPositive ? (
               <TrendingUp className="h-3 w-3 mr-1" />
             ) : (
