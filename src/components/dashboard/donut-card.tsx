@@ -37,7 +37,7 @@ export function DonutCard({ title, value, subtitle, data }: DonutCardProps) {
       <CardContent className="flex items-start justify-between gap-4 px-3 md:px-6 h-full">
         <div className="flex-1 min-w-0">
           <CardTitle className="text-sm md:text-base font-semibold">{title}</CardTitle>
-          <div className="text-3xl md:text-4xl font-bold pt-1">{value}</div>
+          <div className="text-2xl md:text-4xl font-bold pt-1">{value}</div>
           {subtitle && (
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           )}
@@ -48,7 +48,7 @@ export function DonutCard({ title, value, subtitle, data }: DonutCardProps) {
                   className="h-3 w-3 rounded-full" 
                   style={{ backgroundColor: item.fill }} 
                 />
-                <span className="text-xs font-medium">
+                <span className="text-[10px] md:text-xs font-medium">
                   {Math.round((item.value / total) * 100)}% {item.name}
                 </span>
               </div>
