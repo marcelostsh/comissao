@@ -69,7 +69,7 @@ export function DonutCard({ title, value, data }: DonutCardProps) {
           </div>
 
           {/* Donut Chart (Mantendo o estilo que você gostou) */}
-          <div className="relative w-40 h-40 md:w-32 md:h-32 lg:w-36 lg:h-36 shrink-0">
+          <div className="relative w-40 h-40 min-[1500px]:w-32 min-[1500px]:h-32 shrink-0">
             <ChartContainer config={chartConfig} className="w-full h-full">
               <PieChart>
                 <ChartTooltip content={<ChartTooltipContent hideLabel />} />

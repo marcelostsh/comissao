@@ -36,9 +36,9 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4 max-w-[600px] lg:max-w-none mx-auto lg:mx-0">
+      <div className="grid gap-4 min-[1500px]:grid-cols-4 max-w-[600px] min-[1500px]:max-w-none mx-auto min-[1500px]:mx-0">
         {/* Grupo da Esquerda: 4 Cards em 2x2 */}
-        <div className="grid grid-cols-2 gap-4 lg:col-span-2">
+        <div className="grid grid-cols-2 gap-4 min-[1500px]:col-span-2">
           <StatCard
             label="Vendas Realizadas"
             value={124}
