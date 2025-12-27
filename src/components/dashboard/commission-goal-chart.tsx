@@ -1,6 +1,6 @@
 'use client'
 
-import { RadialBar, RadialBarChart, PolarGrid, PolarRadiusAxis, Label } from 'recharts'
+import { RadialBar, RadialBarChart, PolarGrid, PolarRadiusAxis, Label, PolarAngleAxis } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ChartConfig,
@@ -31,24 +31,25 @@ export function CommissionGoalChart() {
       <CardContent className="flex-1 flex items-center justify-center p-0">
         <ChartContainer config={chartConfig} className="mx-auto aspect-square h-[220px]">
           <RadialBarChart
-            data={[{ value: percentage, fill: "var(--color-meta)" }]}
+            cx="50%"
+            cy="50%"
+            innerRadius="80%"
+            outerRadius="100%"
+            barSize={12}
+            data={[{ value: percentage, fill: "#10b981" }]}
             startAngle={90}
-            endAngle={90 + (360 * percentage) / 100}
-            innerRadius={80}
-            outerRadius={110}
+            endAngle={-270}
           >
-            <PolarGrid
-              gridType="circle"
-              radialLines={false}
-              stroke="none"
-              className="first:fill-muted/20 last:fill-muted/5"
-              polarRadius={[86, 74]}
+            <PolarAngleAxis
+              type="number"
+              domain={[0, 100]}
+              angleAxisId={0}
+              tick={false}
             />
-            <RadialBar 
-              dataKey="value" 
-              background={{ fill: "rgba(255, 255, 255, 0.08)" }} 
-              cornerRadius={10} 
-              fill="#10b981" 
+            <RadialBar
+              background={{ fill: "rgba(255, 255, 255, 0.25)" }}
+              dataKey="value"
+              cornerRadius={10}
             />
             <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
               <Label
