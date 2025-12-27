@@ -7,7 +7,7 @@ import {
   Wallet, 
   Calendar as CalendarIcon
 } from "lucide-react"
-import { StatCard, DonutCard } from "@/components/dashboard"
+import { StatCard, DonutCard, MonthlyEvolutionChart, PaymentPipelineChart, MonthlyRhythmChart, CommissionGoalChart } from "@/components/dashboard"
 import { Button } from "@/components/ui/button"
 
 const clientsData = [
@@ -80,6 +80,13 @@ export default function AnalyticsPage() {
           value="R$ 158.400"
           data={foldersData}
         />
+      </div>
+
+      <div className="grid gap-4 min-[1500px]:grid-cols-4 max-w-[600px] min-[1500px]:max-w-none mx-auto min-[1500px]:mx-0 pb-10">
+        <MonthlyEvolutionChart />
+        <MonthlyRhythmChart />
+        <PaymentPipelineChart />
+        <CommissionGoalChart />
       </div>
     </div>
   )
