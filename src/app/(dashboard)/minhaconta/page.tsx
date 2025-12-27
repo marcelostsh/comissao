@@ -23,7 +23,7 @@ import { getEnvironmentVariables, EnvironmentVariable } from '@/app/actions/prof
 import { getSubscription } from '@/app/actions/billing'
 import { getUserPreferences, updateUserMode } from '@/app/actions/user-preferences'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Collapsible,
   CollapsibleContent,
@@ -41,6 +41,7 @@ export default function MinhaContaPage() {
   const { signOut, user, linkIdentity } = useAuth()
   const { profile } = useUser()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [envVars, setEnvVars] = useState<EnvironmentVariable[]>([])
@@ -60,7 +61,7 @@ export default function MinhaContaPage() {
   const handleLinkGoogle = async () => {
     try {
       setIsLinkingGoogle(true)
-      await linkIdentity('google')
+      await linkIdentity('google', '/minhaconta')
     } catch (error: any) {
       toast.error(error.message || 'Erro ao vincular conta Google')
     } finally {

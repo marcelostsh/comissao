@@ -83,8 +83,12 @@ export default function OnboardingPage() {
   }, [user, router])
 
   useEffect(() => {
+    // Se houver erro na URL ou no fragmento, não redireciona automaticamente 
+    // para garantir que o erro seja processado e exibido
+    const hasError = window.location.search.includes('error') || window.location.hash.includes('error')
+    
     // Se o modo organização estiver desabilitado, seleciona 'personal' automaticamente
-    if (!isOrganizationEnabled && user && !loading) {
+    if (!isOrganizationEnabled && user && !loading && !hasError) {
       handleSelectMode('personal')
     }
   }, [isOrganizationEnabled, user, handleSelectMode, loading])

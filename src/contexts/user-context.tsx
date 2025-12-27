@@ -88,22 +88,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         })
       }
 
-      // Se não existe email primário na tabela, criar
+      // Se não existe email primário na tabela, criar de forma silenciosa
       if (!emails || emails.length === 0) {
-        const { data: newEmail } = await supabase
-          .from('user_emails')
-          .upsert({
-            user_id: user.id,
-            email: user.email,
-            is_primary: true,
-            verified: true,
-            verified_at: new Date().toISOString(),
-          }, { onConflict: 'email' })
-          .select('id, email, is_primary, verified')
-          .single()
+        try {
+          const { data: newEmail } = await supabase
+            .from('user_emails')
+            .upsert({
+              user_id: user.id,
+              email: user.email,
+              is_primary: true,
+              verified: true,
+              verified_at: new Date().toISOString(),
+            }, { onConflict: 'email' })
+            .select('id, email, is_primary, verified')
+            .maybeSingle()
 
-        if (newEmail) {
-          userProfile.emails = [newEmail]
+          if (newEmail) {
+            userProfile.emails = [newEmail]
+          }
+        } catch (err) {
+          // Ignoramos erros de sync silencioso para não quebrar o app
+          console.warn('Silent email sync failed:', err)
         }
       }
 

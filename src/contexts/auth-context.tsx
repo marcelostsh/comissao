@@ -14,7 +14,7 @@ type AuthContextType = {
   signUpWithPassword: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>
   resetPassword: (email: string) => Promise<{ error: string | null }>
-  linkIdentity: (provider: 'google') => Promise<void>
+  linkIdentity: (provider: 'google', redirectTo?: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -124,12 +124,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null }
   }
 
-  const linkIdentity = async (provider: 'google') => {
+  const linkIdentity = async (provider: 'google', redirectTo?: string) => {
     if (!supabase) return
+    const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+    if (redirectTo) {
+      callbackUrl.searchParams.set('next', redirectTo)
+    }
+
     const { error } = await supabase.auth.linkIdentity({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: callbackUrl.toString(),
+        queryParams: {
+          prompt: 'select_account',
+        },
       },
     })
 
