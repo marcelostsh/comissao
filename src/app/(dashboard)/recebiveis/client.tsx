@@ -200,7 +200,7 @@ export function ReceivablesClient({ receivables, stats, isHome }: Props) {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl font-bold tracking-tight text-primary">
-              {isHome ? 'Seu Painel Financeiro' : 'Recebíveis'}
+              {isHome ? 'Faturamento' : 'Recebíveis'}
             </h1>
             <p className="text-muted-foreground text-lg">
               {isHome ? 'Resumo de fluxo de caixa e comissões.' : 'Gerencie seu fluxo de comissões com precisão.'}

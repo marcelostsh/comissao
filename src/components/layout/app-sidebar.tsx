@@ -14,7 +14,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
-import { Home, Users, Scale, ShoppingCart, BarChart3, Building2, Settings, PlusCircle, Target, CreditCard } from 'lucide-react'
+import { Home, Users, Scale, ShoppingCart, BarChart3, Building2, Settings, PlusCircle, Target, CreditCard, LayoutDashboard, Wallet } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
@@ -57,7 +57,6 @@ const orgMenuSections: MenuSection[] = [
   {
     label: 'Sistema',
     items: [
-      { title: 'Faturamento', url: '/cobrancas', icon: CreditCard },
       { title: 'Configurações', url: '/configuracoes', icon: Settings },
     ],
   },
@@ -67,7 +66,7 @@ const personalMenuSections: MenuSection[] = [
   {
     label: 'Vendas',
     items: [
-      { title: 'Início', url: '/home', icon: Home },
+      { title: 'Analytics', url: '/home', icon: LayoutDashboard },
       { title: 'Nova Venda', url: '/minhasvendas/nova', icon: PlusCircle },
       { title: 'Minhas Vendas', url: '/minhasvendas', icon: ShoppingCart },
     ],
@@ -82,8 +81,8 @@ const personalMenuSections: MenuSection[] = [
   {
     label: 'Resultados',
     items: [
+      { title: 'Faturamento', url: '/faturamento', icon: Wallet },
       { title: 'Relatórios', url: '/relatorios-vendedor', icon: BarChart3 },
-      { title: 'Faturamento', url: '/cobrancas', icon: CreditCard },
     ],
   },
 ]
